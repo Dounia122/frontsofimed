@@ -5,11 +5,17 @@ import logo from '../../assets/logosofi1.png';
 import './ClienDashboard.css';
 import { Routes, Route } from 'react-router-dom';
 import CatalogueProduits from './CatalogueProduits';
+// Import the Panier component
+import Panier from './Panier';
+import DemandeConsultation from './DemandeConsultation';
+import DemandeDevis from './DemandeDevis';
 
 const ClientDashboard = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
+  // Add state for cart items
+  const [cartItems, setCartItems] = useState([]);
 
   useEffect(() => {
     // Get user data from navigation state or localStorage
@@ -21,12 +27,55 @@ const ClientDashboard = () => {
     }
     
     setUserData(user);
+    
+    // Load cart data from localStorage
+    const savedCart = localStorage.getItem('cart');
+    if (savedCart) {
+      const parsedCart = JSON.parse(savedCart);
+      setCartItems(parsedCart);
+    }
   }, [navigate, location]);
+
+  // Add effect to update cart count when localStorage changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const savedCart = localStorage.getItem('cart');
+      if (savedCart) {
+        setCartItems(JSON.parse(savedCart));
+      } else {
+        setCartItems([]);
+      }
+    };
+
+    // Listen for storage events (when cart is updated from other components)
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Check for cart updates every second (for same-tab updates)
+    const interval = setInterval(() => {
+      const savedCart = localStorage.getItem('cart');
+      if (savedCart) {
+        const parsedCart = JSON.parse(savedCart);
+        if (JSON.stringify(parsedCart) !== JSON.stringify(cartItems)) {
+          setCartItems(parsedCart);
+        }
+      }
+    }, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, [cartItems]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/login');
+  };
+
+  // Calculate total items in cart
+  const getTotalCartItems = () => {
+    return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
 
   return (
@@ -50,16 +99,18 @@ const ClientDashboard = () => {
               <Book className="nav-icon" size={18} />
               <span>Catalogue Produits</span>
             </li>
-            <li className="nav-item">
+            <li className="nav-item" onClick={() => navigate('panier')}>
               <ShoppingCart className="nav-icon" size={18} />
               <span>Mon Panier</span>
-              <span className="cart-badge">2</span>
+              {cartItems.length > 0 && (
+                <span className="cart-badge">{getTotalCartItems()}</span>
+              )}
             </li>
-            <li className="nav-item">
+            <li className="nav-item" onClick={() => navigate('consultation')}>
               <FileText className="nav-icon" size={18} />
               <span>Demande de consultation</span>
             </li>
-            <li className="nav-item">
+            <li className="nav-item" onClick={() => navigate('devis')}>
               <FileText className="nav-icon" size={18} />
               <span>Demande de devis</span>
             </li>
@@ -109,6 +160,10 @@ const ClientDashboard = () => {
       <main className="dashboard-main">
         <Routes>
           <Route path="/catalogue" element={<CatalogueProduits />} />
+          <Route path="/panier" element={<Panier />} />
+          <Route path="/consultation" element={<DemandeConsultation />} />
+          <Route path="/devis" element={<DemandeDevis />} />
+          {/* Add route for the shopping cart */}
           <Route path="/" element={
             <>
               <header className="main-header">
@@ -133,11 +188,11 @@ const ClientDashboard = () => {
                       Commandez en ligne et profitez de nos offres exclusives.
                     </p>
                     <div className="card-actions">
-                      <button className="btn btn-primary">
+                      <button className="btn btn-primary" onClick={() => navigate('catalogue')}>
                         <Book size={16} style={{ marginRight: 8 }} />
                         Parcourir le catalogue
                       </button>
-                      <button className="btn btn-secondary">
+                      <button className="btn btn-secondary" onClick={() => navigate('panier')}>
                         <ShoppingCart size={16} style={{ marginRight: 8 }} />
                         Voir mon panier
                       </button>
@@ -154,15 +209,17 @@ const ClientDashboard = () => {
                 </div>
                 
                 <div className="stats-grid">
-                  {/* Add new stat card */}
+                  {/* Update cart stat card to show actual data */}
                   <div className="stat-card">
                     <div className="stat-icon" style={{ backgroundColor: '#F0F9FF' }}>
                       <ShoppingCart size={20} color="#0EA5E9" />
                     </div>
                     <div className="stat-info">
                       <p className="stat-label">Panier actuel</p>
-                      <p className="stat-value">2 articles</p>
-                      <p className="stat-change">Total: 1,250.00 €</p>
+                      <p className="stat-value">{getTotalCartItems()} article{getTotalCartItems() !== 1 ? 's' : ''}</p>
+                      <p className="stat-change">
+                        {cartItems.length > 0 ? 'Cliquez pour voir' : 'Panier vide'}
+                      </p>
                     </div>
                   </div>
                   <div className="stat-card">

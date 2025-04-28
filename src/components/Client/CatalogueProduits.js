@@ -5,6 +5,7 @@ import debounce from 'lodash.debounce';
 import './CatalogueProduits.css';
 // Add this import
 import noImage from '../../assets/no-image.png';
+import { useNavigate } from 'react-router-dom'; // Add this import for navigation
 
 const API_TIMEOUT = 10000;
 const MAX_RETRIES = 3;
@@ -69,6 +70,14 @@ const CatalogueProduits = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [wishlist, setWishlist] = useState([]);
+  // Add cart state
+  const [cart, setCart] = useState(() => {
+    // Initialize cart from localStorage if available
+    const savedCart = localStorage.getItem('cart');
+    return savedCart ? JSON.parse(savedCart) : [];
+  });
+  const navigate = useNavigate(); // For navigation to cart page
+  
   // Add state for product details modal
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [productDetails, setProductDetails] = useState(null);
@@ -303,6 +312,150 @@ const CatalogueProduits = () => {
     setZoomedImage(null);
   };
 
+  // Add function to handle adding product to cart
+  const addToCart = async (product) => {
+    try {
+      const token = localStorage.getItem('token');
+      const userString = localStorage.getItem('user');
+  
+      if (!token || !userString) {
+        navigate('/login');
+        return;
+      }
+  
+      let user;
+      try {
+        user = JSON.parse(userString);
+      } catch (parseError) {
+        console.error("Erreur de parsing utilisateur:", parseError);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+        return;
+      }
+  
+      if (user?.role !== 'CLIENT') {
+        alert("Seuls les clients peuvent ajouter des produits au panier");
+        return;
+      }
+  
+      // Utiliser directement l'ID du panier 17
+      const cartId = 17;
+  
+      try {
+        // Ajouter le produit au panier
+        const cartItemResponse = await axiosInstance.post(`/api/carts/${cartId}/items`, {
+          produitId: product.id,
+          quantity: 1
+        });
+  
+        if (!cartItemResponse?.data) {
+          throw new Error("Erreur l'ajout du produit au panier");
+        }
+  
+        // Mise à jour du panier local
+        const updatedCart = cart.find(item => item.id === product.id)
+          ? cart.map(item => 
+              item.id === product.id 
+                ? { ...item, quantity: item.quantity + 1 }
+                : item
+            )
+          : [...cart, { ...product, quantity: 1 }];
+  
+        setCart(updatedCart);
+        localStorage.setItem('cart', JSON.stringify(updatedCart));
+        
+        showCartNotification(product);
+  
+      } catch (error) {
+        if (error.response?.status === 404) {
+          alert("Le panier n'existe pas. Veuillez contacter le support.");
+          return;
+        }
+        throw error;
+      }
+  
+    } catch (error) {
+      console.error('Erreur lors de l\'ajout au panier:', error);
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login', { 
+          state: { message: "Votre session a expiré. Veuillez vous reconnecter." }
+        });
+        return;
+      }
+  
+      if (error.response?.status === 403) {
+        alert("Vous n'avez pas les permissions nécessaires pour cette action. Veuillez vous reconnecter.");
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+        return;
+      }
+  
+      alert(error.message || "Une erreur est survenue lors de l'ajout au panier. Veuillez réessayer.");
+    }
+  };
+  
+  // Add custom notification function
+  const showCartNotification = (product) => {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = 'cart-notification';
+    
+    // Create notification content
+    notification.innerHTML = `
+      <div class="notification-content">
+        <div class="notification-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="21" r="1"></circle>
+            <circle cx="20" cy="21" r="1"></circle>
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+          </svg>
+        </div>
+        <div class="notification-message">
+          <p class="notification-title">Produit ajouté au panier</p>
+          <p class="notification-product">${product.nom}</p>
+        </div>
+        <button class="notification-view-cart" onclick="window.location.href='/client/panier'">
+          Voir le panier
+        </button>
+        <button class="notification-close">×</button>
+      </div>
+    `;
+    
+    // Add to document
+    document.body.appendChild(notification);
+    
+    // Add event listener to close button
+    const closeButton = notification.querySelector('.notification-close');
+    closeButton.addEventListener('click', () => {
+      notification.classList.add('notification-hiding');
+      setTimeout(() => {
+        document.body.removeChild(notification);
+      }, 300);
+    });
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        notification.classList.add('notification-hiding');
+        setTimeout(() => {
+          if (document.body.contains(notification)) {
+            document.body.removeChild(notification);
+          }
+        }, 300);
+      }
+    }, 5000);
+    
+    // Animate in
+    setTimeout(() => {
+      notification.classList.add('notification-visible');
+    }, 10);
+  };
+
   return (
     <div className="ecommerce-container">
       <div className="catalogue-header">
@@ -452,7 +605,10 @@ const CatalogueProduits = () => {
                           Voir détails
                         </button>
                         
-                        <button className="add-to-cart">
+                        <button 
+                          className="add-to-cart"
+                          onClick={() => addToCart(product)}
+                        >
                           <ShoppingCart size={16} />
                           Ajouter au panier
                         </button>
@@ -589,7 +745,10 @@ const CatalogueProduits = () => {
                       <span>({selectedProduct.reviews})</span>
                     </div>
                     
-                    <button className="add-to-cart-large">
+                    <button 
+                      className="add-to-cart-large"
+                      onClick={() => addToCart(selectedProduct)}
+                    >
                       <ShoppingCart size={20} />
                       Ajouter au panier
                     </button>
@@ -628,10 +787,10 @@ const CatalogueProduits = () => {
                       <ul>
                         {Array.isArray(productDetails.caracteristiques) 
                           ? productDetails.caracteristiques.map((char, index) => (
-                              <li key={`char-${index}-${char.substring(0, 10)}`}>{char}</li> // Enhanced unique key
+                              <li key={`char-${index}-${char.substring(0, 0)}`}>{char}</li> // Enhanced unique key
                             ))
                           : <li>{productDetails.caracteristiques}</li>
-                        }
+                        }1
                       </ul>
                     </div>
                   )}

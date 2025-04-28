@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./Login.css";
 import sideImage from "../../assets/banner.jpg";
 import companyLogo from '../../assets/logosofi1.png';
@@ -15,6 +15,37 @@ const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Vérifier s'il y a déjà une session active au chargement
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user'));
+    
+    if (token && user) {
+      // Configurer axios avec le token
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      // Rediriger vers le dashboard approprié
+      redirectBasedOnRole(user.role, { userData: user });
+    }
+  }, []);
+
+  // Fonction de redirection selon le rôle
+  const redirectBasedOnRole = (role, state) => {
+    switch (role) {
+      case 'CLIENT':
+        navigate('/client/dashboard', { state, replace: true });
+        break;
+      case 'COMMERCIAL':
+        navigate('/commercial/dashboard', { state, replace: true });
+        break;
+      case 'ADMIN':
+        navigate('/admin/dashboard', { state, replace: true });
+        break;
+      default:
+        setError("Rôle non reconnu");
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,29 +65,30 @@ const Login = () => {
         }
       });
 
-      console.log('Server Response:', response);
-
       if (response.data && response.data.token) {
-        // Store user data
+        // Stocker les données utilisateur
         const userData = {
+          id: response.data.user.id,
           token: response.data.token,
           user: response.data.user,
           email: response.data.user.email,
           username: response.data.user.username,
-          role: response.data.user.role
+          role: response.data.user.role,
+          // Ajouter un timestamp d'expiration (par exemple, 24h)
+          expiresAt: new Date().getTime() + (24 * 60 * 60 * 1000)
         };
 
+        // Sauvegarder dans le localStorage
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(userData));
+        
+        // Configurer axios avec le token
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
 
-        // Navigate to ClientDashboard
-        navigate('/client/dashboard', { 
-          state: { userData },
-          replace: true 
-        });
+        // Rediriger l'utilisateur
+        redirectBasedOnRole(userData.role, { userData });
       } else {
-        throw new Error('Authentication failed');
+        throw new Error('Authentification échouée');
       }
 
     } catch (error) {
