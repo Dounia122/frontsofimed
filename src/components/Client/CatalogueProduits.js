@@ -313,6 +313,45 @@ const CatalogueProduits = () => {
   };
 
   // Add function to handle adding product to cart
+  // ...
+  // Ajouter l'état pour stocker l'ID du panier actif
+  const [activeCartId, setActiveCartId] = useState(null);
+  
+  // Ajouter la fonction pour récupérer le panier actif
+  const fetchActiveCart = async () => {
+      try {
+          const userString = localStorage.getItem('user');
+          if (!userString) {
+              console.log('Utilisateur non trouvé');
+              navigate('/login');
+              return;
+          }
+  
+          const user = JSON.parse(userString);
+          const response = await axiosInstance.get(`/api/carts/current/${user.id}`);
+  
+          // La réponse contient directement l'ID du panier
+          if (response.data) {
+              setActiveCartId(response.data);
+              return response.data;
+          }
+          return null;
+      } catch (error) {
+          if (error.response?.status === 404) {
+              console.error('Aucun panier trouvé pour cet utilisateur');
+          } else {
+              console.error('Erreur lors de la récupération du panier:', error);
+          }
+          return null;
+      }
+  };
+  
+  // Utiliser useEffect pour charger le panier au montage du composant
+  useEffect(() => {
+    fetchActiveCart();
+  }, []);
+  
+  // Modifier la fonction addToCart
   const addToCart = async (product) => {
     try {
       const token = localStorage.getItem('token');
@@ -338,21 +377,28 @@ const CatalogueProduits = () => {
         alert("Seuls les clients peuvent ajouter des produits au panier");
         return;
       }
-  
-      // Utiliser directement l'ID du panier 17
-      const cartId = 17;
-  
+
+      // Use activeCartId from state instead of hardcoded value
+      if (!activeCartId) {
+        // If no active cart, try to fetch it again
+        await fetchActiveCart();
+        if (!activeCartId) {
+          alert("Impossible de récupérer votre panier. Veuillez réessayer.");
+          return;
+        }
+      }
+
       try {
         // Ajouter le produit au panier
-        const cartItemResponse = await axiosInstance.post(`/api/carts/${cartId}/items`, {
+        const cartItemResponse = await axiosInstance.post(`/api/carts/${activeCartId}/items`, {
           produitId: product.id,
           quantity: 1
         });
-  
+
         if (!cartItemResponse?.data) {
           throw new Error("Erreur l'ajout du produit au panier");
         }
-  
+
         // Mise à jour du panier local
         const updatedCart = cart.find(item => item.id === product.id)
           ? cart.map(item => 
@@ -361,7 +407,7 @@ const CatalogueProduits = () => {
                 : item
             )
           : [...cart, { ...product, quantity: 1 }];
-  
+
         setCart(updatedCart);
         localStorage.setItem('cart', JSON.stringify(updatedCart));
         
