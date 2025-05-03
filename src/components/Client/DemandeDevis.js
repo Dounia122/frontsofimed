@@ -41,9 +41,20 @@ const DemandeDevis = () => {
     }
   }, [messages]);
 
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('user'));
+    if (user) {
+      setUserData(user);
+      fetchDevisList();  // Make the API call
+    } else {
+      // If no user is found, show appropriate error
+      setError("Utilisateur non connecté. Veuillez vous reconnecter.");
+      setLoading(false);
+    }
+  }, []);
+
   const fetchDevisList = async () => {
     setLoading(true);
-    // Move user declaration outside of try block so it's accessible in the catch block
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user'));
     
@@ -54,63 +65,54 @@ const DemandeDevis = () => {
     }
     
     try {
-      console.log("Fetching devis for user ID:", user.id);
-      console.log("Using token:", token ? "Token exists" : "No token found");
-      
-      // Make sure we're using the correct endpoint format and properly sending the token
       const response = await axios({
         method: 'get',
-        url: `http://localhost:8080/api/devis/user/${user.id}`,
+        url: `http://localhost:8080/api/devis/client/${user.id}`,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
       
-      console.log("API Response:", response.data);
-      
       if (Array.isArray(response.data)) {
-        setDevisList(response.data);
+        // Transformation des données pour assurer la structure correcte
+        const formattedDevis = response.data.map(devis => ({
+          ...devis,
+          title: devis.title || 'Sans titre',
+          reference: devis.reference || 'Réf. non disponible',
+          status: devis.status || 'EN_ATTENTE',
+          createdAt: devis.createdAt || new Date().toISOString(),
+          updatedAt: devis.updatedAt || devis.createdAt || new Date().toISOString(),
+          commercial: devis.commercial || null,
+          unreadMessages: devis.unreadMessages || 0
+        }));
+        setDevisList(formattedDevis);
         setError('');
       } else {
-        console.error("Response is not an array:", response.data);
+        console.error("Format de réponse incorrect:", response.data);
         setError("Format de réponse incorrect");
-        // Fallback to mock data
-        setDevisList(mockDevisList);
       }
     } catch (err) {
       console.error('Erreur lors du chargement des devis:', err);
       
-      // Handle authentication errors
       if (err.response) {
-        console.log("Error response status:", err.response.status);
-        console.log("Error response data:", err.response.data);
-        
         if (err.response.status === 401) {
           setError("Session expirée. Veuillez vous reconnecter.");
-          // Force user to re-login
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           setTimeout(() => {
             window.location.href = '/login';
           }, 2000);
         } else if (err.response.status === 403) {
-          setError("Accès refusé. Vous n'avez pas les permissions nécessaires pour accéder à ces données. Veuillez vous reconnecter ou contacter l'administrateur.");
+          setError("Accès refusé. Vous n'avez pas les permissions nécessaires.");
         } else {
-          const errorMessage = err.response.data.message || 'Impossible de charger vos demandes de devis';
-          setError(`Erreur ${err.response.status}: ${errorMessage}`);
+          setError(`Erreur: ${err.response.data.message || 'Impossible de charger vos devis'}`);
         }
       } else if (err.request) {
-        // Request was made but no response received
         setError("Le serveur ne répond pas. Veuillez réessayer plus tard.");
       } else {
-        // Something else caused the error
-        setError("Une erreur s'est produite lors de la récupération des données.");
+        setError("Une erreur s'est produite lors de la récupération des devis.");
       }
-      
-      // Use mock data as fallback for development
-      console.log("Using mock data as fallback");
-      setDevisList(mockDevisList);
     } finally {
       setLoading(false);
     }
@@ -203,14 +205,26 @@ const DemandeDevis = () => {
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(date);
+    if (!dateString) return 'Date non disponible';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date string received:', dateString);
+        return 'Date invalide';
+      }
+      
+      return new Intl.DateTimeFormat('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Date invalide';
+    }
   };
 
   const getUnreadMessagesCount = (devis) => {
@@ -364,10 +378,12 @@ const DemandeDevis = () => {
                   <div key={devis.id} className="devis-card">
                     <div className="devis-card-header">
                       <h3>{devis.title}</h3>
-                      <span className={`status-badge ${devis.status.toLowerCase().replace('é', 'e')}`}>
-                        {devis.status === 'EN_ATTENTE' ? 'En attente' : 
-                         devis.status === 'EN_COURS' ? 'En cours' : 
-                         devis.status === 'TERMINÉ' ? 'Terminé' : devis.status}
+                      <span className={`status-badge ${devis.status ? devis.status.toLowerCase().replace('é', 'e') : 'unknown'}`}>
+                        {devis.status ? (
+                          devis.status === 'EN_ATTENTE' ? 'En attente' : 
+                          devis.status === 'EN_COURS' ? 'En cours' : 
+                          devis.status === 'TERMINÉ' ? 'Terminé' : devis.status
+                        ) : 'Status inconnu'}
                       </span>
                     </div>
                     
@@ -381,7 +397,11 @@ const DemandeDevis = () => {
                     
                     <div className="devis-card-commercial">
                       <p className="commercial-info">
-                        <span>Commercial assigné:</span> {devis.commercial.firstName} {devis.commercial.lastName}
+                        <span>Commercial assigné:</span> 
+                        {devis.commercial ? 
+                          `${devis.commercial.firstName} ${devis.commercial.lastName}` : 
+                          'Non assigné'
+                        }
                       </p>
                     </div>
                     
@@ -389,9 +409,10 @@ const DemandeDevis = () => {
                       <button 
                         className="view-commercial-btn"
                         onClick={() => handleViewCommercialDetails(devis.commercial)}
+                        disabled={!devis.commercial}
                       >
                         <User size={16} />
-                        Voir le profil
+                        {devis.commercial ? 'Voir le profil' : 'Pas de commercial'}
                       </button>
                       
                       <button 
@@ -420,10 +441,18 @@ const DemandeDevis = () => {
             <div className="chat-header">
               <div className="chat-header-info">
                 <div className="chat-header-avatar">
-                  {activeDevis.commercial.firstName.charAt(0)}{activeDevis.commercial.lastName.charAt(0)}
+                  {activeDevis.commercial ? 
+                    `${activeDevis.commercial.firstName.charAt(0)}${activeDevis.commercial.lastName.charAt(0)}` :
+                    'NA'
+                  }
                 </div>
                 <div className="chat-header-text">
-                  <h3>{activeDevis.commercial.firstName} {activeDevis.commercial.lastName}</h3>
+                  <h3>
+                    {activeDevis.commercial ? 
+                      `${activeDevis.commercial.firstName} ${activeDevis.commercial.lastName}` :
+                      'Commercial non assigné'
+                    }
+                  </h3>
                   <p>Devis: {activeDevis.reference}</p>
                 </div>
               </div>
@@ -549,3 +578,7 @@ const DemandeDevis = () => {
 };
 
 export default DemandeDevis;
+
+// Supprimer ou commenter les données mockées
+// const mockDevisList = [ ... ];
+// const mockMessages = [ ... ];

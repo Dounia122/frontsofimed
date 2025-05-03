@@ -45,28 +45,49 @@ const Panier = () => {
       const token = localStorage.getItem('token');
       const user = JSON.parse(localStorage.getItem('user'));
       
-      // Vérification de l'authentification
       if (!token || !user) {
         navigate('/login');
         return;
       }
 
       try {
-        // Récupération de l'ID du panier actif
+        setIsLoading(prev => ({ ...prev, cart: true }));
+        setError('');
+
+        // Récupération du panier actif
         const cartResponse = await axiosInstance.get(`/carts/current/${user.id}`);
-        setCartId(cartResponse.data);
-        
-        // Chargement des articles du panier
-        const itemsResponse = await axiosInstance.get(`/carts/${cartResponse.data}/items`);
-        setCart(itemsResponse.data);
+        const cartId = cartResponse.data;
+        setCartId(cartId);
+
+        if (cartId) {
+          // Utilisation du nouvel endpoint pour récupérer les articles
+          const itemsResponse = await axiosInstance.get(`/carts/${cartId}/itemss`);
+          // Traitement des images comme dans CatalogueProduits
+          const processedItems = (itemsResponse.data || []).map(item => {
+            let imageUrl;
+            if (item.imageUrl) {
+              try {
+                imageUrl = require(`../../assets/products/${item.imageUrl}`);
+              } catch {
+                imageUrl = noImage;
+              }
+            } else {
+              imageUrl = noImage;
+            }
+            return {
+              ...item,
+              imageUrl
+            };
+          });
+          setCart(processedItems);
+        }
       } catch (err) {
         console.error("Erreur d'initialisation du panier:", err);
-        setError("Impossible de charger le panier. Veuillez réessayer.");
-        
-        // Chargement du panier local en fallback
-        const savedCart = localStorage.getItem('cart');
-        if (savedCart) {
-          setCart(JSON.parse(savedCart));
+        if (err.response?.status === 403) {
+          setError("Session expirée. Veuillez vous reconnecter.");
+          navigate('/login', { state: { sessionExpired: true } });
+        } else {
+          setError("Impossible de charger le panier. Veuillez réessayer.");
         }
       } finally {
         setIsLoading(prev => ({ ...prev, cart: false }));
@@ -163,8 +184,13 @@ const Panier = () => {
     try {
       setIsLoading(prev => ({ ...prev, action: true }));
       setError('');
-      // Envoi du commentaire avec la demande de devis
-      await axiosInstance.post(`/carts/${cartId}/validate`, { paymentMethod, commentaire });
+      
+      await axiosInstance.post('/devis/create', {
+        cartId,
+        paymentMethod,
+        commentaire
+      });
+
       setCart([]);
       localStorage.removeItem('cart');
       navigate('/client/dashboard/catalogue', { 
@@ -186,7 +212,11 @@ const Panier = () => {
 
   // Calcul du nombre total d'articles
   const getTotalItems = () => {
-    return cart.reduce((total, item) => total + item.quantity, 0);
+    if (!cart || !Array.isArray(cart)) return 0;
+    return cart.reduce((total, item) => {
+      const quantity = parseInt(item.quantity, 10);
+      return total + (isNaN(quantity) ? 0 : quantity);
+    }, 0);
   };
 
   // Affichage du composant
@@ -294,7 +324,7 @@ const Panier = () => {
             <h2>Résumé de la commande</h2>
             <div className="summary-row">
               <span>Nombre d'articles:</span>
-              <span>{getTotalItems()}</span>
+              <span>{getTotalItems() || 0}</span>
             </div>
             <div className="summary-row total">
               <span>Total:</span>
@@ -309,17 +339,7 @@ const Panier = () => {
                     key={opt.value}
                     type="button"
                     className={`payment-btn${paymentMethod === opt.value ? ' selected' : ''}`}
-                    onClick={async () => {
-                      setPaymentMethod(opt.value);
-                      try {
-                        setIsLoading(prev => ({ ...prev, action: true }));
-                        await axiosInstance.post(`/carts/${cartId}/update-payment-method`, { paymentMethod: opt.value });
-                      } catch (err) {
-                        setError("Erreur lors de la mise à jour du mode de paiement");
-                      } finally {
-                        setIsLoading(prev => ({ ...prev, action: false }));
-                      }
-                    }}
+                    onClick={() => setPaymentMethod(opt.value)}
                     disabled={isLoading.action}
                   >
                     {opt.label}
