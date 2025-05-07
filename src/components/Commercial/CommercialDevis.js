@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import './CommercialDevis.css';
-import { FileText, MessageCircle, User, Search, Filter, Download, Eye, AlertCircle, Loader, Home, Users, ChartBar, History, Settings, HelpCircle, LogOut, Bell } from 'lucide-react';
+
+
+import './CommercialDevis.css'; // Ajoutez cette ligne
+import { FileText, MessageCircle, User, Search, Filter, Download, Eye, AlertCircle, Loader, Home, Users, ChartBar, History, Settings, HelpCircle, LogOut, Bell, Mail, Phone, Send, CheckCircle } from 'lucide-react';
 import axios from 'axios';
 import './CommercialDashboard.css';
-import CommercialChat from './CommercialChat';
 import logo from '../../assets/logosofi1.png';
+
 
 const CommercialDevis = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [userData, setUserData] = useState(null);
-  const [devisList, setDevisList] = useState([]); // Initialiser avec un tableau vide au lieu des données mockées
+  const [devisList, setDevisList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,6 +22,39 @@ const CommercialDevis = () => {
   const [selectedDevis, setSelectedDevis] = useState(null);
   const [showPrixModal, setShowPrixModal] = useState(false);
   const [selectedDevisForPrix, setSelectedDevisForPrix] = useState(null);
+  const [showClientDetails, setShowClientDetails] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
+
+  const handleViewClient = async (devis) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError("Session expirée. Veuillez vous reconnecter.");
+        return;
+      }
+  
+      const response = await axios.get(`http://localhost:8080/api/devis/${devis.id}/client`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (response.data) {
+        setSelectedClient({
+          ...response.data,
+          // Assurez-vous que ces champs existent dans la réponse
+          firstName: response.data.firstName || 'Non spécifié',
+          lastName: response.data.lastName || 'Non spécifié',
+          email: response.data.email || 'Non spécifié',
+          phone: response.data.phone || 'Non spécifié',
+          orderCount: response.data.orderCount || 0,
+          lastOrderDate: response.data.lastOrderDate || null
+        });
+        setShowClientDetails(true);
+      }
+    } catch (err) {
+      console.error('Erreur client:', err.response?.data || err.message);
+      setError(err.response?.data?.message || "Erreur lors de la récupération des informations client");
+    }
+  };
 
   const handleViewDevis = (devis) => {
     console.log('Devis sélectionné:', devis); // Vérifiez la console pour ce log
@@ -41,14 +76,12 @@ const CommercialDevis = () => {
       }
 
       const user = JSON.parse(localStorage.getItem('user'));
-      console.log('User data:', user);
-
       if (!user || !user.id) {
         setError("Informations utilisateur non disponibles");
         setLoading(false);
         return;
       }
-      
+
       // Récupérer d'abord l'ID commercial
       const commercialResponse = await axios.get(`http://localhost:8080/api/commercials/user/${user.id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -61,38 +94,24 @@ const CommercialDevis = () => {
       }
 
       const commercialId = commercialResponse.data.id;
-      console.log('Commercial ID récupéré:', commercialId);
       
-      // Utiliser l'ID commercial pour récupérer les devis
+      // Utiliser l'endpoint /api/devis/commercial/{commercialId}
       const response = await axios.get(`http://localhost:8080/api/devis/commercial/${commercialId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      
-      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+
+      if (response.data) {
         setDevisList(response.data);
+        setError('');
       }
-      setError('');
     } catch (err) {
-      console.error('Erreur complète:', {
-        message: err.message,
-        response: err.response,
-        data: err.response?.data
-      });
-      
+      console.error('Erreur lors de la récupération des devis:', err);
       if (err.response?.status === 403) {
         setError("Accès refusé. Veuillez vérifier vos permissions.");
         localStorage.removeItem('token');
-        window.location.href = '/login';
-      } else if (err.response?.status === 500 && 
-                 typeof err.response.data === 'string' &&
-                 err.response.data.toLowerCase().includes("erreur serveur : aucun devis trouvé")) {
-        // Cas spécifique : aucun devis trouvé
-        setDevisList([]);
-        setError(''); // État normal, pas d'erreur
-      } else if (err.response?.status === 500) {
-        setError("Une erreur technique est survenue. Veuillez réessayer ultérieurement.");
+        navigate('/login');
       } else {
-        setError(err.response?.data || "Impossible de charger la liste des devis");
+        setError("Impossible de charger la liste des devis");
       }
     } finally {
       setLoading(false);
@@ -122,9 +141,32 @@ const CommercialDevis = () => {
     }
   };
 
-  const handleOpenChat = (devis) => {
-    setSelectedDevis(devis);
-    setShowChat(true);
+  const handleOpenChat = async (devis) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError("Session expirée. Veuillez vous reconnecter.");
+        return;
+      }
+
+      // Récupérer d'abord les informations du client
+      const response = await axios.get(`http://localhost:8080/api/devis/${devis.id}/client`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.data) {
+        // Mettre à jour le devis avec les informations complètes du client
+        const devisWithClient = {
+          ...devis,
+          client: response.data
+        };
+        setSelectedDevis(devisWithClient);
+        setShowChat(true);
+      }
+    } catch (err) {
+      console.error('Erreur lors de la récupération du client:', err);
+      alert('Impossible de charger les informations du client');
+    }
   };
 
   const handleCloseChat = () => {
@@ -146,11 +188,18 @@ const CommercialDevis = () => {
 
   // Keep only these single declarations
   const filteredDevis = devisList.filter(devis => {
-    const matchesSearch = devis.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         devis.client.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         devis.client.lastName.toLowerCase().includes(searchTerm.toLowerCase());
+    // Vérification de sécurité pour les propriétés
+    const reference = devis?.reference?.toLowerCase() || '';
+    const firstName = devis?.client?.firstName?.toLowerCase() || '';
+    const lastName = devis?.client?.lastName?.toLowerCase() || '';
+    const searchTermLower = searchTerm.toLowerCase();
+  
+    const matchesSearch = 
+        reference.includes(searchTermLower) ||
+        firstName.includes(searchTermLower) ||
+        lastName.includes(searchTermLower);
     
-    const matchesFilter = filterStatus === 'TOUS' || devis.status === filterStatus;
+    const matchesFilter = filterStatus === 'TOUS' || devis?.status === filterStatus;
     
     return matchesSearch && matchesFilter;
   });
@@ -306,20 +355,22 @@ const LoadingState = () => (
                     <tr key={devis.id}>
                       <td>{devis.reference}</td>
                       <td>
-                        <div className="client-info">
+                        <div className="client-info clickable" onClick={() => handleViewClient(devis)}>
                           <User size={16} />
-                          <span>{devis.client.firstName} {devis.client.lastName}</span>
+                          <span>
+                            {devis.client ? `${devis.client.firstName || ''} ${devis.client.lastName || ''}` : 'Client '}
+                          </span>
                         </div>
                       </td>
                       <td>
-                        <span className={`client-status-badge ${getClientStatus(devis.client).class}`}>
-                          {getClientStatus(devis.client).label}
+                        <span className={`client-status-badge ${devis.client ? getClientStatus(devis.client).class : 'client-unknown'}`}>
+                          {devis.client ? getClientStatus(devis.client).label : 'Statut inconnu'}
                         </span>
                       </td>
                       <td>{new Date(devis.createdAt).toLocaleDateString('fr-FR')}</td>
                       <td>
                         <span className={`status-badge ${getStatusColor(devis.status)}`}>
-                          {devis.status.replace('_', ' ')}
+                          {devis.status ? devis.status.replace('_', ' ') : 'Status inconnu'}
                         </span>
                       </td>
                       <td>
@@ -339,14 +390,11 @@ const LoadingState = () => (
                             <Download size={16} />
                           </button>
                           <button 
-                            className="action-btn chat" 
-                            title="Discuter avec le client"
+                            className="contact-btn"
                             onClick={() => handleOpenChat(devis)}
+                            disabled={!devis.id}
                           >
                             <MessageCircle size={16} />
-                            {devis.unreadMessages > 0 && (
-                              <span className="notification-badge">{devis.unreadMessages}</span>
-                            )}
                           </button>
                         </div>
                       </td>
@@ -356,13 +404,80 @@ const LoadingState = () => (
               </table>
             )}
           </div>
-          
-          {showChat && selectedDevis && (
-            <ChatModal 
-              devis={selectedDevis} 
-              onClose={handleCloseChat} 
-            />
+
+          {showClientDetails && selectedClient && (
+            <div className="client-details-modal">
+              <div className="client-details-container">
+                <div className="client-details-header">
+                  <h3>Détails du Client</h3>
+                  <button className="close-details-btn" onClick={() => setShowClientDetails(false)}>
+                    &times;
+                  </button>
+                </div>
+                
+                <div className="client-info-section">
+                  <h4>
+                    <User size={24} /> 
+                    Informations Personnelles
+                  </h4>
+                  <div className="client-info-row">
+                    <span className="client-info-label">
+                      <User size={18} /> 
+                      Nom complet
+                    </span>
+                    <span className="client-info-value">
+                      {selectedClient.firstName} {selectedClient.lastName}
+                    </span>
+                  </div>
+                  <div className="client-info-row">
+                    <span className="client-info-label">
+                      <Mail size={18} /> 
+                      Email
+                    </span>
+                    <span className="client-info-value">
+                      {selectedClient.email || 'Non spécifié'}
+                    </span>
+                  </div>
+                  <div className="client-info-row">
+                    <span className="client-info-label">
+                      <Phone size={18} /> 
+                      Téléphone
+                    </span>
+                    <span className="client-info-value">
+                      {selectedClient.phone || 'Non spécifié'}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="client-info-section">
+                  <h4>
+                    <ChartBar size={24} /> 
+                    Statistiques Client
+                  </h4>
+                  <div className="client-info-row">
+                    <span className="client-info-label">
+                      <FileText size={18} /> 
+                      Nombre de commandes
+                    </span>
+                    <span className="client-info-value">
+                      {selectedClient.orderCount || '0'}
+                    </span>
+                  </div>
+                  <div className="client-info-row">
+                    <span className="client-info-label">
+                      <History size={18} /> 
+                      Dernière commande
+                    </span>
+                    <span className="client-info-value">
+                      {selectedClient.lastOrderDate ? new Date(selectedClient.lastOrderDate).toLocaleDateString('fr-FR') : 'Aucune commande'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
+
+         
           {showPrixModal && selectedDevisForPrix && (
             <PrixModal 
               devis={selectedDevisForPrix} 
@@ -372,102 +487,58 @@ const LoadingState = () => (
           )}
         </div>
       </main>
+      
+      {/* Ajouter le ChatModal ici, à l'intérieur du composant principal */}
+      {showChat && selectedDevis && (
+        <ChatModal 
+          devis={selectedDevis}
+          onClose={handleCloseChat}
+        />
+      )}
     </div>
   );
 };
 
-// Supprimer ou commenter les données mockées
-// const mockDevisList = [ ... ];
-
 export default CommercialDevis;
 
+// Définition du composant ChatModal
 const ChatModal = ({ devis, onClose }) => {
-  const [messages, setMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState('');
-  const messagesEndRef = useRef(null);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
-    
-    const message = {
-      id: Date.now(),
-      text: newMessage,
-      sender: 'commercial',
-      timestamp: new Date().toISOString(),
-    };
-
-    setMessages([...messages, message]);
-    setNewMessage('');
-  };
-
   return (
     <div className="chat-modal">
       <div className="chat-container">
         <div className="chat-header">
-          <div className="chat-header-info">
-            <div className="chat-header-avatar">
-              {devis.client.firstName[0] + devis.client.lastName[0]}
+          <div className="chat-user-info">
+            <div className="chat-avatar">
+              {devis.client?.firstName?.charAt(0) || 'C'}
             </div>
-            <div className="chat-header-text">
-              <h3>{devis.client.firstName} {devis.client.lastName}</h3>
-              <p>Devis: {devis.reference}</p>
+            <div className="chat-user-details">
+              <h3>
+                {devis.client ? 
+                  `${devis.client.firstName} ${devis.client.lastName}` :
+                  'Client non identifié'
+                }
+              </h3>
+              <p className="devis-reference">Devis: {devis.reference}</p>
             </div>
           </div>
-          <button className="close-chat-btn" onClick={onClose}>&times;</button>
+          <button className="close-chat-btn" onClick={onClose}>×</button>
         </div>
 
         <div className="chat-messages">
-          {messages.length === 0 ? (
-            <div className="no-messages">
-              Commencez la conversation avec votre client
-            </div>
-          ) : (
-            messages.map(message => (
-              <div key={message.id} 
-                   className={`message ${message.sender === 'commercial' ? 'sent' : 'received'}`}>
-                {message.sender === 'client' && (
-                  <div className="message-avatar">
-                    {devis.client.firstName[0] + devis.client.lastName[0]}
-                  </div>
-                )}
-                <div className="message-content">
-                  <p>{message.text}</p>
-                  <span className="message-time">
-                    {new Date(message.timestamp).toLocaleTimeString()}
-                  </span>
-                </div>
-              </div>
-            ))
-          )}
-          <div ref={messagesEndRef} />
+          <div className="no-messages">
+            <p>Conversation avec {devis.client?.firstName} {devis.client?.lastName}</p>
+          </div>
         </div>
 
-        <div className="chat-input">
+        <div className="chat-input-container">
           <textarea
-            placeholder="Écrivez votre message..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-            }}
+            className="message-input"
+            placeholder="Écrivez un message..."
           />
           <button 
             className="send-message-btn"
-            onClick={handleSendMessage}
-            disabled={!newMessage.trim()}
           >
-            <MessageCircle size={20} />
+            <Send size={20} />
           </button>
         </div>
       </div>
@@ -475,114 +546,185 @@ const ChatModal = ({ devis, onClose }) => {
   );
 };
 
+// Définition du composant PrixModal
 const PrixModal = ({ devis, onClose, onUpdate }) => {
-  const [prix, setPrix] = useState(devis.prix || 0);
-  const [produits, setProduits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [produits, setProduits] = useState([]);
+  const [totalPrice, setTotalPrice] = useState(0);
+
+  // Add the getStatusColor function here to make it available in this component
+  const getStatusColor = (status) => {
+    switch(status) {
+      case 'EN_ATTENTE': return 'status-pending';
+      case 'EN_COURS': return 'status-progress';
+      case 'TERMINÉ': return 'status-completed';
+      default: return '';
+    }
+  };
 
   useEffect(() => {
     const fetchProduits = async () => {
       try {
+        setLoading(true);
         const token = localStorage.getItem('token');
-        const response = await axios.get(`http://localhost:8080/api/devis/${devis.id}/produits`, {
+        if (!token) {
+          setError("Session expirée. Veuillez vous reconnecter.");
+          return;
+        }
+
+        // Récupérer les produits du devis
+        const response = await axios.get(`http://localhost:8080/api/devis/${devis.id}/items`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        setProduits(response.data);
+
+        if (response.data) {
+          setProduits(response.data);
+          // Calculer le prix total
+          const total = response.data.reduce((sum, item) => sum + (item.prix * item.quantity), 0);
+          setTotalPrice(total);
+        }
       } catch (err) {
         console.error('Erreur lors de la récupération des produits:', err);
+        setError("Impossible de charger les produits du devis");
       } finally {
         setLoading(false);
       }
     };
+
     fetchProduits();
   }, [devis.id]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const formatPrice = (price) => {
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(price);
+  };
+
+  const handleDownloadDevis = async (devisId) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.put(`http://localhost:8080/api/devis/${devis.id}/prix`, 
-        { prix: parseFloat(prix) },
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
-      onUpdate();
-      onClose();
+      const response = await axios.get(`http://localhost:8080/api/devis/download/${devisId}`, {
+        headers: { 
+          'Authorization': `Bearer ${token}` 
+        },
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `devis-${devisId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     } catch (err) {
-      console.error('Erreur lors de la mise à jour du prix:', err);
-      alert('Erreur lors de la mise à jour du prix');
+      console.error('Erreur lors du téléchargement:', err);
+      alert('Erreur lors du téléchargement du devis');
     }
   };
 
   return (
     <div className="prix-modal">
-      <div className="prix-container">
-        <div className="prix-header">
-          <h3>Détails du devis</h3>
-          <button className="close-prix-btn" onClick={onClose}>&times;</button>
+      <div className="prix-modal-content">
+        <div className="prix-modal-header">
+          <h3>Détails du devis: {devis.reference}</h3>
+          <button className="close-modal-btn" onClick={onClose}>×</button>
         </div>
-        
-        <div className="prix-content">
-          <div className="devis-info">
-            <h4>Informations générales</h4>
-            <p>Référence: {devis.reference}</p>
-            <p>Client: {devis.client.firstName} {devis.client.lastName}</p>
-            <p>Statut: {devis.status}</p>
-          </div>
 
-          <div className="produits-list">
-            <h4>Produits du devis</h4>
-            {loading ? (
-              <div className="loading-produits">
-                Chargement des produits...
-              </div>
-            ) : produits.length === 0 ? (
-              <div className="no-produits">
-                Aucun produit dans ce devis
-              </div>
-            ) : (
-              produits.map(produit => (
-                <div key={produit.id} className="produit-item">
-                  <div className="produit-image">
-                    <img 
-                      src={produit.imageUrl} 
-                      alt={produit.nom}
-                      onError={(e) => {
-                        e.target.src = '/placeholder-image.png';
-                      }}
-                    />
-                  </div>
-                  <div className="produit-info">
-                    <h5>{produit.nom}</h5>
-                    <p className="produit-description">{produit.description}</p>
-                    <p className="produit-prix">{produit.prix} €</p>
-                    <p className="produit-quantite">Quantité: {produit.quantite}</p>
-                  </div>
-                </div>
-              ))
-            )}
+        <div className="devis-info-section">
+          <div className="devis-info-row">
+            <span className="devis-info-label">Client:</span>
+            <span className="devis-info-value">
+              {devis.client ? `${devis.client.firstName} ${devis.client.lastName}` : 'Non spécifié'}
+            </span>
           </div>
+          <div className="devis-info-row">
+            <span className="devis-info-label">Date de création:</span>
+            <span className="devis-info-value">
+              {new Date(devis.createdAt).toLocaleDateString('fr-FR')}
+            </span>
+          </div>
+          <div className="devis-info-row">
+            <span className="devis-info-label">Statut:</span>
+            <span className={`status-badge ${getStatusColor(devis.status)}`}>
+              {devis.status ? devis.status.replace('_', ' ') : 'Status inconnu'}
+            </span>
+          </div>
+        </div>
 
-          <div className="prix-total">
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label htmlFor="prix">Prix total (DH)</label>
-                <input
-                  type="number"
-                  id="prix"
-                  value={prix}
-                  onChange={(e) => setPrix(e.target.value)}
-                  min="0"
-                  step="0.01"
-                  required
-                />
-              </div>
-              <div className="prix-actions">
-                <button type="submit" className="submit-prix-btn">
-                  Mettre à jour le prix
+        <div className="produits-list-container">
+          <h4>Produits</h4>
+          
+          {loading ? (
+            <div className="loading-state">
+              <Loader className="spinner" />
+              <p>Chargement des produits...</p>
+            </div>
+          ) : error ? (
+            <div className="error-state">
+              <AlertCircle />
+              <p>{error}</p>
+            </div>
+          ) : produits.length === 0 ? (
+            <div className="empty-state">
+              <p>Aucun produit associé à ce devis</p>
+            </div>
+          ) : (
+            <>
+              <table className="produits-table">
+                <thead>
+                  <tr>
+                    <th>Produit</th>
+                    <th>Référence</th>
+                    <th>Prix unitaire</th>
+                    <th>Quantité</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {produits.map(produit => (
+                    <tr key={produit.id}>
+                      <td>
+                        <div className="produit-info">
+                          {produit.imageUrl && (
+                            <img 
+                              src={produit.imageUrl.startsWith('http') ? produit.imageUrl : require(`../../assets/products/${produit.imageUrl}`)} 
+                              alt={produit.nom} 
+                              className="produit-thumbnail"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = '../../assets/no-image.png';
+                              }}
+                            />
+                          )}
+                          <span>{produit.nom}</span>
+                        </div>
+                      </td>
+                      <td>{produit.reference || 'N/A'}</td>
+                      <td>{formatPrice(produit.prix)}</td>
+                      <td>{produit.quantity}</td>
+                      <td>{formatPrice(produit.prix * produit.quantity)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan="4" className="total-label">Total</td>
+                    <td className="total-value">{formatPrice(totalPrice)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+              
+              <div className="devis-actions">
+                <button 
+                  className="btn btn-primary"
+                  onClick={() => handleDownloadDevis(devis.id)}
+                >
+                  <Download size={16} />
+                  Télécharger le devis
                 </button>
               </div>
-            </form>
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>
