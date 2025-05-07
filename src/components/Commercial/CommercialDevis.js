@@ -552,6 +552,7 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
   const [error, setError] = useState('');
   const [produits, setProduits] = useState([]);
   const [totalPrice, setTotalPrice] = useState(0);
+  const [clientInfo, setClientInfo] = useState(null);
 
   // Add the getStatusColor function here to make it available in this component
   const getStatusColor = (status) => {
@@ -564,7 +565,7 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
   };
 
   useEffect(() => {
-    const fetchProduits = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
@@ -574,29 +575,79 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
         }
 
         // Récupérer les produits du devis
-        const response = await axios.get(`http://localhost:8080/api/devis/${devis.id}/items`, {
+        const produitsResponse = await axios.get(`http://localhost:8080/api/devis/${devis.id}/items`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (response.data) {
-          setProduits(response.data);
+        // Récupérer les informations du client
+        const clientResponse = await axios.get(`http://localhost:8080/api/devis/${devis.id}/client`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (produitsResponse.data) {
+          setProduits(produitsResponse.data);
           // Calculer le prix total
-          const total = response.data.reduce((sum, item) => sum + (item.prix * item.quantity), 0);
-          setTotalPrice(total);
+          calculateTotal(produitsResponse.data);
+        }
+
+        if (clientResponse.data) {
+          setClientInfo(clientResponse.data);
         }
       } catch (err) {
-        console.error('Erreur lors de la récupération des produits:', err);
-        setError("Impossible de charger les produits du devis");
+        console.error('Erreur lors de la récupération des données:', err);
+        setError("Impossible de charger les données du devis");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProduits();
+    fetchData();
   }, [devis.id]);
 
+  const calculateTotal = (items) => {
+    const total = items.reduce((sum, item) => sum + (item.prix * item.quantity), 0);
+    setTotalPrice(total);
+  };
+
+  const handlePriceChange = (id, newPrice) => {
+    // Vérifier que le prix est un nombre valide
+    if (isNaN(newPrice) || newPrice < 0) return;
+
+    const updatedProduits = produits.map(produit => {
+      if (produit.id === id) {
+        return { ...produit, prix: parseFloat(newPrice) };
+      }
+      return produit;
+    });
+
+    setProduits(updatedProduits);
+    calculateTotal(updatedProduits);
+  };
+
   const formatPrice = (price) => {
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(price);
+    return new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(price);
+  };
+
+  const handleSaveChanges = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError("Session expirée. Veuillez vous reconnecter.");
+        return;
+      }
+
+      // Envoyer les modifications au serveur
+      await axios.put(`http://localhost:8080/api/devis/${devis.id}/items`, produits, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      // Mettre à jour la liste des devis
+      onUpdate();
+      alert("Les modifications ont été enregistrées avec succès");
+    } catch (err) {
+      console.error('Erreur lors de la sauvegarde:', err);
+      setError("Impossible d'enregistrer les modifications");
+    }
   };
 
   const handleDownloadDevis = async (devisId) => {
@@ -630,13 +681,31 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
           <button className="close-modal-btn" onClick={onClose}>×</button>
         </div>
 
-        <div className="devis-info-section">
-          <div className="devis-info-row">
-            <span className="devis-info-label">Client:</span>
-            <span className="devis-info-value">
-              {devis.client ? `${devis.client.firstName} ${devis.client.lastName}` : 'Non spécifié'}
-            </span>
+        {/* Informations du client */}
+        {clientInfo && (
+          <div className="client-info-section">
+            <h4>
+              <User size={20} /> 
+              Informations Client
+            </h4>
+            <div className="client-info-grid">
+              <div className="client-info-item">
+                <span className="client-info-label">Nom complet</span>
+                <span className="client-info-value">{clientInfo.firstName} {clientInfo.lastName}</span>
+              </div>
+              <div className="client-info-item">
+                <span className="client-info-label">Email</span>
+                <span className="client-info-value">{clientInfo.email || 'Non spécifié'}</span>
+              </div>
+              <div className="client-info-item">
+                <span className="client-info-label">Téléphone</span>
+                <span className="client-info-value">{clientInfo.phone || 'Non spécifié'}</span>
+              </div>
+            </div>
           </div>
+        )}
+
+        <div className="devis-info-section">
           <div className="devis-info-row">
             <span className="devis-info-label">Date de création:</span>
             <span className="devis-info-value">
@@ -675,9 +744,9 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
                   <tr>
                     <th>Produit</th>
                     <th>Référence</th>
-                    <th>Prix unitaire</th>
+                    <th>Prix unitaire (DH)</th>
                     <th>Quantité</th>
-                    <th>Total</th>
+                    <th>Total (DH)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -700,7 +769,16 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
                         </div>
                       </td>
                       <td>{produit.reference || 'N/A'}</td>
-                      <td>{formatPrice(produit.prix)}</td>
+                      <td>
+                        <input 
+                          type="number" 
+                          className="price-input" 
+                          value={produit.prix} 
+                          onChange={(e) => handlePriceChange(produit.id, e.target.value)}
+                          min="0"
+                          step="0.01"
+                        />
+                      </td>
                       <td>{produit.quantity}</td>
                       <td>{formatPrice(produit.prix * produit.quantity)}</td>
                     </tr>
@@ -715,6 +793,13 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
               </table>
               
               <div className="devis-actions">
+                <button 
+                  className="btn btn-success"
+                  onClick={handleSaveChanges}
+                >
+                  <CheckCircle size={16} />
+                  Enregistrer les modifications
+                </button>
                 <button 
                   className="btn btn-primary"
                   onClick={() => handleDownloadDevis(devis.id)}
