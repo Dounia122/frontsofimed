@@ -9,6 +9,8 @@ import CatalogueProduits from './CatalogueProduits';
 import Panier from './Panier';
 import DemandeConsultation from './DemandeConsultation';
 import DemandeDevis from './DemandeDevis';
+import SockJS from 'sockjs-client';
+import { Client as StompClient } from '@stomp/stompjs';
 
 const ClientDashboard = () => {
   const location = useLocation();
@@ -16,6 +18,8 @@ const ClientDashboard = () => {
   const [userData, setUserData] = useState(null);
   // Add state for cart items
   const [cartItems, setCartItems] = useState([]);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [stompClient, setStompClient] = useState(null);
 
   useEffect(() => {
     // Get user data from navigation state or localStorage
@@ -33,6 +37,10 @@ const ClientDashboard = () => {
     if (savedCart) {
       const parsedCart = JSON.parse(savedCart);
       setCartItems(parsedCart);
+    }
+    // Ajout : Récupérer le nombre de messages non lus au chargement
+    if (user) {
+      fetchUnreadMessages(user.id);
     }
   }, [navigate, location]);
 
@@ -77,6 +85,45 @@ const ClientDashboard = () => {
   const getTotalCartItems = () => {
     return cartItems.reduce((total, item) => total + item.quantity, 0);
   };
+
+  // Fonction pour récupérer le nombre de messages non lus
+  const fetchUnreadMessages = async (userId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8080/api/messages/unread/count?userId=${userId}&userType=client`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadMessages(data.total || 0);
+      }
+    } catch (error) {
+      setUnreadMessages(0);
+    }
+  };
+
+  // Ajout : WebSocket pour notification en temps réel
+  useEffect(() => {
+    if (!userData) return;
+    const socket = new SockJS('http://localhost:8080/ws');
+    const client = new StompClient({
+      webSocketFactory: () => socket,
+      onConnect: () => {
+        // S'abonner au topic des messages pour ce client
+        client.subscribe(`/topic/messages/${userData.id}`, () => {
+          fetchUnreadMessages(userData.id);
+        });
+      }
+    });
+    client.activate();
+    setStompClient(client);
+
+    return () => {
+      client.deactivate();
+    };
+  }, [userData]);
 
   return (
     <div className="dashboard-container">
@@ -170,11 +217,13 @@ const ClientDashboard = () => {
                 <h2>Tableau de Bord</h2>
                 <div className="header-actions">
                   <button className="notification-badge">
-                    <span className="badge-count">3</span>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                       <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                     </svg>
+                    {unreadMessages > 0 && (
+                      <span className="badge-count">{unreadMessages}</span>
+                    )}
                   </button>
                 </div>
               </header>
@@ -250,8 +299,8 @@ const ClientDashboard = () => {
                     </div>
                     <div className="stat-info">
                       <p className="stat-label">Messages non lus</p>
-                      <p className="stat-value">3</p>
-                      <p className="stat-change negative">Réponse urgente</p>
+                      <p className="stat-value">{unreadMessages}</p>
+                      <p className="stat-change negative">{unreadMessages > 0 ? 'Réponse urgente' : 'Aucun message'}</p>
                     </div>
                   </div>
                 </div>

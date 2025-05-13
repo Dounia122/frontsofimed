@@ -218,27 +218,37 @@
     display: flex;
     align-items: center;
     justify-content: center;
-  }
-  
-  .notification-badge:hover {
+    width: 40px; /* Ajouté pour garantir la taille */
+    height: 40px; /* Ajouté pour garantir la taille */
+}
+
+.notification-badge svg {
+    width: 24px;
+    height: 24px;
+    display: block;
+}
+
+.notification-badge:hover {
     background-color: var(--primary-light);
-  }
-  
-  .badge-count {
+}
+
+.badge-count {
     position: absolute;
-    top: 2px;
-    right: 2px;
+    top: 4px; /* Ajusté pour un meilleur placement */
+    right: 4px; /* Ajusté pour un meilleur placement */
     background-color: var(--danger);
     color: white;
-    font-size: 0.625rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-  }
+    z-index: 2;
+    box-shadow: 0 0 0 2px var(--white);
+}
   
   .content-wrapper {
     padding: 2rem;
@@ -748,27 +758,37 @@
     display: flex;
     align-items: center;
     justify-content: center;
-  }
-  
-  .notification-badge:hover {
+    width: 40px; /* Ajouté pour garantir la taille */
+    height: 40px; /* Ajouté pour garantir la taille */
+}
+
+.notification-badge svg {
+    width: 24px;
+    height: 24px;
+    display: block;
+}
+
+.notification-badge:hover {
     background-color: var(--primary-light);
-  }
-  
-  .badge-count {
+}
+
+.badge-count {
     position: absolute;
-    top: 2px;
-    right: 2px;
+    top: 4px; /* Ajusté pour un meilleur placement */
+    right: 4px; /* Ajusté pour un meilleur placement */
     background-color: var(--danger);
     color: white;
-    font-size: 0.625rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-  }
+    z-index: 2;
+    box-shadow: 0 0 0 2px var(--white);
+}
   
   .content-wrapper {
     padding: 2rem;

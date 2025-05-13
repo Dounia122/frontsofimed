@@ -566,167 +566,99 @@
 }
 
 /* Styles pour le chat modal */
-/* Variables CSS modernes */
-:root {
-  /* Couleurs primaires */
-  --primary-50: #eff6ff;
-  --primary-100: #dbeafe;
-  --primary-200: #bfdbfe;
-  --primary-300: #93c5fd;
-  --primary-400: #60a5fa;
-  --primary-500: #3b82f6;
-  --primary-600: #2563eb;
-  --primary-700: #1d4ed8;
-  --primary-800: #1e40af;
-  --primary-900: #1e3a8a;
-  
-  /* Couleurs neutres */
-  --gray-50: #f8fafc;
-  --gray-100: #f1f5f9;
-  --gray-200: #e2e8f0;
-  --gray-300: #cbd5e1;
-  --gray-400: #94a3b8;
-  --gray-500: #64748b;
-  --gray-600: #475569;
-  --gray-700: #334155;
-  --gray-800: #1e293b;
-  --gray-900: #0f172a;
-  
-  /* Couleurs de statut */
-  --success-50: #ecfdf5;
-  --success-100: #d1fae5;
-  --success-500: #10b981;
-  --warning-50: #fffbeb;
-  --warning-100: #fef3c7;
-  --warning-500: #f59e0b;
-  --error-50: #fef2f2;
-  --error-100: #fee2e2;
-  --error-500: #ef4444;
-  
-  /* Ombre */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-}
-
-/* Modal de chat amélioré */
 .chat-modal {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background-color: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: center;
   justify-content: center;
-  z-index: 50;
-  backdrop-filter: blur(4px);
-  animation: fadeIn 0.2s ease-out;
+  align-items: center;
+  z-index: 1000;
 }
 
 .chat-container {
   width: 90%;
-  max-width: 600px;
-  height: 80vh;
-  max-height: 700px;
-  background-color: white;
-  border-radius: 0.75rem;
-  box-shadow: var(--shadow-lg);
+  max-width: 500px;
+  height: 80%;
+  max-height: 600px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: slideIn 0.3s ease-out;
 }
 
 .chat-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid var(--gray-200);
-  background-color: var(--gray-50);
+  justify-content: space-between;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
 }
 
 .chat-user-info {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
 }
 
 .chat-avatar {
-  width: 2.5rem;
-  height: 2.5rem;
-  background-color: var(--primary-500);
-  color: white;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
+  background-color: #4a6cf7;
+  color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  font-size: 1rem;
-  flex-shrink: 0;
+  font-weight: bold;
+  margin-right: 10px;
 }
 
-.chat-user-details h3 {
+.chat-header-text h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--gray-900);
 }
 
 .devis-reference {
-  margin: 0.25rem 0 0;
-  font-size: 0.875rem;
-  color: var(--gray-500);
+  margin: 0;
+  font-size: 12px;
+  color: #6c757d;
 }
 
 .close-chat-btn {
   background: none;
   border: none;
-  font-size: 1.5rem;
-  color: var(--gray-500);
+  font-size: 24px;
   cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 0.25rem;
-  transition: all 0.15s ease;
+  color: #6c757d;
 }
 
-.close-chat-btn:hover {
-  color: var(--gray-700);
-  background-color: var(--gray-200);
-  transform: rotate(90deg);
-}
-
-/* Messages */
 .chat-messages {
   flex: 1;
-  padding: 1rem;
+  padding: 15px;
   overflow-y: auto;
-  background-color: var(--gray-50);
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 10px;
+  background-color: #f8f9fa;
 }
 
-.no-messages {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: var(--gray-400);
-  font-size: 0.875rem;
-  text-align: center;
-  padding: 2rem;
-}
-
+/* Styles pour les messages */
 .message {
   display: flex;
-  margin-bottom: 0.75rem;
-  max-width: 80%;
+  max-width: 70%;
+  margin-bottom: 10px;
 }
 
 .message.sent {
   align-self: flex-end;
-  justify-content: flex-end;
+  margin-left: auto;
 }
 
 .message.received {
@@ -734,128 +666,122 @@
 }
 
 .message-content {
-  padding: 0.75rem 1rem;
-  border-radius: 1rem;
+  padding: 10px 15px;
+  border-radius: 18px;
   position: relative;
-  line-height: 1.4;
 }
 
 .message.sent .message-content {
-  background-color: var(--primary-500);
+  background-color: #4a6cf7;
   color: white;
-  border-bottom-right-radius: 0.25rem;
+  border-bottom-right-radius: 4px;
 }
 
 .message.received .message-content {
   background-color: white;
-  color: var(--gray-800);
-  border: 1px solid var(--gray-200);
-  border-bottom-left-radius: 0.25rem;
-  box-shadow: var(--shadow-sm);
+  color: #212529;
+  border: 1px solid #e9ecef;
+  border-bottom-left-radius: 4px;
 }
 
 .message-content p {
   margin: 0;
-  font-size: 0.875rem;
+  word-break: break-word;
 }
 
 .message-time {
-  font-size: 0.6875rem;
-  margin-top: 0.25rem;
-  opacity: 0.8;
-  display: block;
+  font-size: 10px;
+  margin-top: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .message.sent .message-time {
-  text-align: right;
   color: rgba(255, 255, 255, 0.8);
 }
 
 .message.received .message-time {
-  color: var(--gray-500);
+  color: #6c757d;
 }
 
-/* Zone de saisie */
+.message-status {
+  margin-left: 4px;
+  display: inline-flex;
+}
+
+.read-status svg {
+  color: #fff;
+}
+
+.sent-status svg {
+  color: rgba(255, 255, 255, 0.5);
+}
+
 .chat-input-container {
-  padding: 1rem;
-  border-top: 1px solid var(--gray-200);
   display: flex;
-  align-items: flex-end;
-  gap: 0.75rem;
-  background-color: white;
+  padding: 15px;
+  background-color: #fff;
+  border-top: 1px solid #e9ecef;
 }
 
 .message-input {
   flex: 1;
-  border: 1px solid var(--gray-300);
-  border-radius: 1.5rem;
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
+  border: 1px solid #ced4da;
+  border-radius: 20px;
+  padding: 10px 15px;
   resize: none;
-  min-height: 3rem;
-  max-height: 8rem;
-  outline: none;
+  height: 40px;
   font-family: inherit;
-  transition: all 0.15s ease;
-}
-
-.message-input:focus {
-  border-color: var(--primary-500);
-  box-shadow: 0 0 0 3px var(--primary-100);
 }
 
 .send-message-btn {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background-color: var(--primary-500);
+  background-color: #4a6cf7;
   color: white;
   border: none;
+  margin-left: 10px;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  flex-shrink: 0;
-}
-
-.send-message-btn:hover {
-  background-color: var(--primary-600);
-  transform: scale(1.05);
 }
 
 .send-message-btn:disabled {
-  background-color: var(--gray-300);
+  background-color: #ced4da;
   cursor: not-allowed;
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.loading-messages, .error-messages, .no-messages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #6c757d;
+  text-align: center;
+  padding: 20px;
 }
 
-@keyframes slideIn {
-  from { transform: translateY(1rem); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-/* Scrollbar personnalisée */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: var(--gray-100);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--gray-300);
+.retry-btn {
+  margin-top: 10px;
+  padding: 5px 15px;
+  background-color: #4a6cf7;
+  color: white;
+  border: none;
   border-radius: 4px;
+  cursor: pointer;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-400);
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 @media (max-width: 768px) {
@@ -934,12 +860,14 @@
 
 /* Styles pour les inputs de prix */
 .price-input {
-  width: 100px;
+  width: 100%;
+  max-width: 120px;
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 0.9rem;
   transition: all 0.2s ease;
+  text-align: right;
 }
 
 .price-input:focus {
@@ -948,16 +876,31 @@
   outline: none;
 }
 
+.price-input[value="null"] {
+  font-style: italic;
+  color: var(--text-light);
+}
+
+.price-input[value="0"] {
+  color: var(--text-light);
+}
+
+/* Style pour les valeurs à zéro */
+.zero-value {
+  color: var(--text-light);
+}
+
 .prix-modal-content {
   background: white;
   border-radius: 12px;
-  width: 90%;
-  max-width: 900px;
+  width: 95%;
+  max-width: 1200px; /* Augmentation de la largeur maximale */
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   padding: 24px;
   position: relative;
+  min-width: 900px; /* Augmentation de la largeur minimale */
 }
 
 .prix-modal-header {
@@ -1058,6 +1001,7 @@
   border-collapse: separate;
   border-spacing: 0;
   margin-bottom: 24px;
+  table-layout: fixed; /* Stabilise la largeur des colonnes */
 }
 
 .produits-table th {
@@ -1075,6 +1019,7 @@
   border-bottom: 1px solid var(--border);
   color: var(--text);
   font-size: 0.9rem;
+  vertical-align: middle;
 }
 
 .produits-table tr:last-child td {
@@ -1099,14 +1044,141 @@
   font-weight: 600;
 }
 
-.produits-table tfoot .total-label {
-  text-align: right;
-  color: var(--text);
+/* Définir des largeurs spécifiques pour chaque colonne */
+.produits-table th:nth-child(1), 
+.produits-table td:nth-child(1) {
+  width: 25%; /* Colonne produit */
 }
 
-.produits-table tfoot .total-value {
-  color: var(--primary);
+.produits-table th:nth-child(2), 
+.produits-table td:nth-child(2) {
+  width: 10%; /* Colonne référence */
+}
+
+.produits-table th:nth-child(3), 
+.produits-table td:nth-child(3) {
+  width: 10%; /* Colonne prix unitaire */
+  text-align: right;
+}
+
+.produits-table th:nth-child(4), 
+.produits-table td:nth-child(4) {
+  width: 10%; /* Colonne remise */
+  text-align: center;
+}
+
+.produits-table th:nth-child(5), 
+.produits-table td:nth-child(5) {
+  width: 15%; /* Colonne prix après remise */
+  text-align: right;
+}
+
+.produits-table th:nth-child(6), 
+.produits-table td:nth-child(6) {
+  width: 10%; /* Colonne quantité */
+  text-align: center;
+}
+
+.produits-table th:nth-child(7), 
+.produits-table td:nth-child(7) {
+  width: 20%; /* Colonne total */
+  text-align: right;
+}
+
+/* Style pour le total */
+.produits-table tfoot td {
+  border-top: 2px solid var(--border);
+  font-weight: 600;
+  padding: 16px;
+}
+
+.total-label {
+  text-align: right;
   font-size: 1.1rem;
+  color: var(--text);
+  padding-right: 16px;
+}
+
+.total-value {
+  text-align: right;
+  font-size: 1.2rem;
+  color: var(--primary);
+  white-space: nowrap;
+  font-weight: 700;
+  min-width: 150px; /* Assure une largeur minimale pour le total */
+}
+
+/* Section de calcul global */
+.calcul-global-section {
+  background: var(--background);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 24px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.calcul-global-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.calcul-global-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.calcul-item {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calcul-label {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.calcul-value {
+  font-size: 1.1rem;
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+}
+
+.calcul-total {
+  grid-column: 1 / -1;
+  background: var(--primary-50);
+  border: 1px solid var(--primary-200);
+  padding: 16px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.calcul-total-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--primary-800);
+}
+
+.calcul-total-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--primary-700);
+  min-width: 150px;
+  text-align: right;
 }
 
 .devis-actions {
@@ -1167,5 +1239,37 @@
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* Style pour les valeurs nulles */
+.null-value {
+  font-style: italic;
+  color: var(--text-light);
+}
+
+/* Styles pour les remises */
+.remise-cell {
+  width: 120px;
+}
+
+.remise-input {
+  width: 60px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  text-align: right;
+}
+
+.remise-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  outline: none;
+}
+
+.prix-remise {
+  font-weight: 600;
+  color: var(--success);
 }
 

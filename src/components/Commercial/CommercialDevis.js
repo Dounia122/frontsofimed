@@ -503,6 +503,175 @@ export default CommercialDevis;
 
 // Définition du composant ChatModal
 const ChatModal = ({ devis, onClose }) => {
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
+  const messagesEndRef = useRef(null);
+  const userData = JSON.parse(localStorage.getItem('user'));
+  const [commercialId, setCommercialId] = useState(null);
+  const [commercialName, setCommercialName] = useState('');
+
+  useEffect(() => {
+    fetchMessages();
+    fetchCommercialId();
+  }, [devis.id]);
+
+  useEffect(() => {
+    // Scroll vers le bas des messages quand ils changent
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  const fetchCommercialId = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const commercialResponse = await axios.get(`http://localhost:8080/api/commercials/user/${userData.id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (commercialResponse.data && commercialResponse.data.id) {
+        setCommercialId(commercialResponse.data.id);
+        // Récupérer aussi le nom du commercial pour l'envoi de messages
+        setCommercialName(`${commercialResponse.data.firstName || ''} ${commercialResponse.data.lastName || ''}`.trim());
+      }
+    } catch (err) {
+      console.error('Erreur lors de la récupération des informations du commercial:', err);
+    }
+  };
+
+  const fetchMessages = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      console.log(`Récupération des messages pour le devis ${devis.id}`);
+      
+      const response = await axios.get(`http://localhost:8080/api/messages/devis/${devis.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      console.log('Réponse API messages:', response.data);
+      
+      // S'assurer que messages est toujours un tableau et nettoyer les données circulaires
+      const messagesData = Array.isArray(response.data) ? response.data.map(msg => {
+        // Créer une copie propre du message sans références circulaires
+        return {
+          id: msg.id,
+          content: msg.content,
+          timestamp: msg.timestamp,
+          senderId: msg.senderId,
+          senderName: msg.senderName,
+          recipientId: msg.recipientId,
+          read: msg.read,
+          devisId: msg.devisId
+        };
+      }) : [];
+      
+      console.log('Messages formatés:', messagesData);
+      setMessages(messagesData);
+      
+      // Marquer les messages comme lus
+      await axios.put(`http://localhost:8080/api/messages/devis/${devis.id}/read`, {}, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      setError('');
+    } catch (err) {
+      console.error('Erreur lors du chargement des messages:', err);
+      setError("Impossible de charger les messages. Veuillez réessayer.");
+      // Réinitialiser messages à un tableau vide en cas d'erreur
+      setMessages([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || sending) return;
+    
+    setSending(true);
+    try {
+      const token = localStorage.getItem('token');
+      
+      if (!commercialId) {
+        throw new Error("ID du commercial non disponible");
+      }
+      
+      const messageData = {
+        devisId: devis.id,
+        senderId: commercialId,
+        senderName: commercialName || 'Commercial',
+        recipientId: devis.client.id,
+        content: newMessage.trim()
+      };
+      
+      console.log('Envoi du message:', messageData);
+      
+      const response = await axios.post('http://localhost:8080/api/messages', messageData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Réponse après envoi:', response.data);
+      
+      // Ajouter le nouveau message à la liste en créant un objet propre
+      if (response.data) {
+        const newMsg = {
+          id: response.data.id,
+          content: response.data.content,
+          timestamp: response.data.timestamp,
+          senderId: response.data.senderId,
+          senderName: response.data.senderName,
+          recipientId: response.data.recipientId,
+          read: response.data.read,
+          devisId: response.data.devisId
+        };
+        
+        setMessages(prevMessages => {
+          // Vérifier que prevMessages est un tableau
+          const currentMessages = Array.isArray(prevMessages) ? prevMessages : [];
+          return [...currentMessages, newMsg];
+        });
+      }
+      
+      setNewMessage('');
+    } catch (err) {
+      console.error('Erreur lors de l\'envoi du message:', err);
+      alert('Impossible d\'envoyer le message. Veuillez réessayer.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Fonction sécurisée pour formater les dates
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    
+    try {
+      const date = new Date(dateString);
+      // Vérifier si la date est valide
+      if (isNaN(date.getTime())) {
+        console.log('Date invalide:', dateString);
+        return '';
+      }
+      return date.toLocaleTimeString('fr-FR', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+    } catch (error) {
+      console.error('Erreur de formatage de date:', error);
+      return '';
+    }
+  };
+
   return (
     <div className="chat-modal">
       <div className="chat-container">
@@ -511,34 +680,87 @@ const ChatModal = ({ devis, onClose }) => {
             <div className="chat-avatar">
               {devis.client?.firstName?.charAt(0) || 'C'}
             </div>
-            <div className="chat-user-details">
-              <h3>
-                {devis.client ? 
-                  `${devis.client.firstName} ${devis.client.lastName}` :
-                  'Client non identifié'
-                }
-              </h3>
+            <div className="chat-header-text">
+              <h3>{devis.client?.firstName} {devis.client?.lastName}</h3>
               <p className="devis-reference">Devis: {devis.reference}</p>
             </div>
           </div>
           <button className="close-chat-btn" onClick={onClose}>×</button>
         </div>
-
+        
         <div className="chat-messages">
-          <div className="no-messages">
-            <p>Conversation avec {devis.client?.firstName} {devis.client?.lastName}</p>
-          </div>
+          {loading ? (
+            <div className="loading-messages">
+              <Loader size={24} className="spinner" />
+              <p>Chargement des messages...</p>
+            </div>
+          ) : error ? (
+            <div className="error-messages">
+              <AlertCircle size={24} />
+              <p>{error}</p>
+              <button onClick={fetchMessages} className="retry-btn">Réessayer</button>
+            </div>
+          ) : !Array.isArray(messages) || messages.length === 0 ? (
+            <div className="no-messages">
+              <p>Aucun message dans cette conversation. Commencez à discuter avec {devis.client?.firstName}.</p>
+            </div>
+          ) : (
+            <>
+              {messages.map((msg, index) => {
+                // Déterminer si le message a été envoyé par le commercial connecté
+                const isCommercial = msg.senderId === commercialId;
+                
+                return (
+                  <div 
+                    key={msg.id || index} 
+                    className={`message ${isCommercial ? 'sent' : 'received'}`}
+                  >
+                    <div className="message-content">
+                      <p>{msg.content}</p>
+                      <span className="message-time">
+                        {formatDate(msg.timestamp)}
+                        {isCommercial && (
+                          <span className="message-status">
+                            {msg.read ? (
+                              <span className="read-status">
+                                <CheckCircle size={12} />
+                              </span>
+                            ) : (
+                              <span className="sent-status">
+                                <CheckCircle size={12} opacity={0.5} />
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={messagesEndRef} />
+            </>
+          )}
         </div>
-
+        
         <div className="chat-input-container">
           <textarea
             className="message-input"
-            placeholder="Écrivez un message..."
+            placeholder="Écrivez votre message..."
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
           />
           <button 
-            className="send-message-btn"
+            className="send-message-btn" 
+            onClick={handleSendMessage}
+            disabled={sending || !newMessage.trim()}
           >
-            <Send size={20} />
+            {sending ? <Loader size={16} className="spinner" /> : <Send size={16} />}
           </button>
         </div>
       </div>
@@ -553,6 +775,8 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
   const [produits, setProduits] = useState([]);
   const [totalPrice, setTotalPrice] = useState(0);
   const [clientInfo, setClientInfo] = useState(null);
+  const [savingPrices, setSavingPrices] = useState(false);
+  const [remises, setRemises] = useState({});  // État pour stocker les remises par produit
 
   // Add the getStatusColor function here to make it available in this component
   const getStatusColor = (status) => {
@@ -585,9 +809,18 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
         });
 
         if (produitsResponse.data) {
-          setProduits(produitsResponse.data);
+          const produitsData = produitsResponse.data;
+          setProduits(produitsData);
+          
+          // Initialiser les remises à 0% pour chaque produit
+          const remisesInitiales = {};
+          produitsData.forEach(produit => {
+            remisesInitiales[produit.id] = 0;
+          });
+          setRemises(remisesInitiales);
+          
           // Calculer le prix total
-          calculateTotal(produitsResponse.data);
+          calculateTotal(produitsData, remisesInitiales);
         }
 
         if (clientResponse.data) {
@@ -604,72 +837,112 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
     fetchData();
   }, [devis.id]);
 
-  const calculateTotal = (items) => {
-    const total = items.reduce((sum, item) => sum + (item.prix * item.quantity), 0);
+  const calculateTotal = (items, remisesObj) => {
+    const total = items.reduce((sum, item) => {
+      const prix = item.prix !== null ? item.prix : 0;
+      const quantity = item.quantity || 0;
+      const remise = remisesObj[item.id] || 0;
+      
+      // Calculer le prix après remise
+      const prixApresRemise = prix * (1 - remise / 100);
+      
+      return sum + (prixApresRemise * quantity);
+    }, 0);
     setTotalPrice(total);
   };
 
   const handlePriceChange = (id, newPrice) => {
-    // Vérifier que le prix est un nombre valide
-    if (isNaN(newPrice) || newPrice < 0) return;
-
+    // Vérifier que le prix est un nombre valide ou zéro
+    const parsedPrice = newPrice === '' ? 0 : parseFloat(newPrice);
+    
     const updatedProduits = produits.map(produit => {
       if (produit.id === id) {
-        return { ...produit, prix: parseFloat(newPrice) };
+        return { ...produit, prix: parsedPrice };
       }
       return produit;
     });
 
     setProduits(updatedProduits);
-    calculateTotal(updatedProduits);
+    calculateTotal(updatedProduits, remises);
   };
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(price);
+  // Fonction pour gérer les changements de remise
+  const handleRemiseChange = (id, newRemise) => {
+    // Vérifier que la remise est un nombre valide entre 0 et 100
+    let parsedRemise = newRemise === '' ? 0 : parseFloat(newRemise);
+    parsedRemise = Math.min(Math.max(parsedRemise, 0), 100); // Limiter entre 0 et 100
+    
+    const updatedRemises = {
+      ...remises,
+      [id]: parsedRemise
+    };
+    
+    setRemises(updatedRemises);
+    calculateTotal(produits, updatedRemises);
   };
 
-  const handleSaveChanges = async () => {
+  // Fonction pour calculer le prix après remise
+  const getPrixApresRemise = (produit) => {
+    const prix = produit.prix !== null ? produit.prix : 0;
+    const remise = remises[produit.id] || 0;
+    return prix * (1 - remise / 100);
+  };
+
+  const formatNumber = (number) => {
+    if (number === null || isNaN(number)) {
+      return "0";
+    }
+    return new Intl.NumberFormat('fr-MA').format(number);
+  };
+
+  const formatTotalPrice = (price) => {
+    if (price === null || isNaN(price)) {
+      return "0 MAD";
+    }
+    return new Intl.NumberFormat('fr-MA').format(price) + " MAD";
+  };
+
+  // Fonction pour sauvegarder les modifications de prix et remises
+  const handleSavePrices = async () => {
     try {
+      setSavingPrices(true);
       const token = localStorage.getItem('token');
       if (!token) {
         setError("Session expirée. Veuillez vous reconnecter.");
         return;
       }
 
-      // Envoyer les modifications au serveur
-      await axios.put(`http://localhost:8080/api/devis/${devis.id}/items`, produits, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      // Préparer les données à envoyer
+      const itemPrices = {};
+      const itemDiscounts = {};
+      
+      produits.forEach(produit => {
+        itemPrices[produit.id] = produit.prix;
+        itemDiscounts[produit.id] = remises[produit.id] || 0;
       });
 
-      // Mettre à jour la liste des devis
-      onUpdate();
-      alert("Les modifications ont été enregistrées avec succès");
-    } catch (err) {
-      console.error('Erreur lors de la sauvegarde:', err);
-      setError("Impossible d'enregistrer les modifications");
-    }
-  };
-
-  const handleDownloadDevis = async (devisId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`http://localhost:8080/api/devis/download/${devisId}`, {
-        headers: { 
-          'Authorization': `Bearer ${token}` 
+      // Envoyer la requête POST pour mettre à jour les prix et remises
+      await axios.post(
+        `http://localhost:8080/api/devis/${devis.id}/update-prices`,
+        {
+          itemPrices: itemPrices,
+          itemDiscounts: itemDiscounts,
+          total: totalPrice
         },
-        responseType: 'blob'
-      });
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `devis-${devisId}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      // Informer l'utilisateur et fermer le modal
+      alert('Prix et remises mis à jour avec succès');
+      onUpdate(); // Rafraîchir la liste des devis
+      onClose(); // Fermer le modal
     } catch (err) {
-      console.error('Erreur lors du téléchargement:', err);
-      alert('Erreur lors du téléchargement du devis');
+      console.error('Erreur lors de la mise à jour des prix:', err);
+      setError("Impossible de mettre à jour les prix: " + (err.response?.data || err.message));
+    } finally {
+      setSavingPrices(false);
     }
   };
 
@@ -744,9 +1017,11 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
                   <tr>
                     <th>Produit</th>
                     <th>Référence</th>
-                    <th>Prix unitaire (DH)</th>
+                    <th>Prix unitaire</th>
+                    <th>Remise (%)</th>
+                    <th>Prix après remise</th>
                     <th>Quantité</th>
-                    <th>Total (DH)</th>
+                    <th>Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -771,41 +1046,89 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
                       <td>{produit.reference || 'N/A'}</td>
                       <td>
                         <input 
-                          type="number" 
+                          type="text" 
                           className="price-input" 
-                          value={produit.prix} 
+                          value={produit.prix === null || produit.prix === 0 ? '0' : produit.prix} 
                           onChange={(e) => handlePriceChange(produit.id, e.target.value)}
-                          min="0"
-                          step="0.01"
                         />
                       </td>
-                      <td>{produit.quantity}</td>
-                      <td>{formatPrice(produit.prix * produit.quantity)}</td>
+                      <td className="remise-cell">
+                        <input 
+                          type="number" 
+                          className="remise-input" 
+                          value={remises[produit.id] || 0} 
+                          onChange={(e) => handleRemiseChange(produit.id, e.target.value)}
+                          min="0"
+                          max="100"
+                        />
+                      </td>
+                      <td className="prix-remise">
+                        {formatNumber(getPrixApresRemise(produit))}
+                      </td>
+                      <td>{produit.quantity || 0}</td>
+                      <td>{formatNumber(getPrixApresRemise(produit) * produit.quantity)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan="4" className="total-label">Total</td>
-                    <td className="total-value">{formatPrice(totalPrice)}</td>
+                    <td colSpan="6" className="total-label">Total</td>
+                    <td className="total-value">{formatTotalPrice(totalPrice)}</td>
                   </tr>
                 </tfoot>
               </table>
               
-              <div className="devis-actions">
+              {/* Section de calcul global */}
+              <div className="calcul-global-section">
+                <h4 className="calcul-global-title">Calcul Global</h4>
+                <div className="calcul-global-grid">
+                  <div className="calcul-item">
+                    <span className="calcul-label">Sous-total HT</span>
+                    <span className="calcul-value">{formatTotalPrice(totalPrice)}</span>
+                  </div>
+                  <div className="calcul-item">
+                    <span className="calcul-label">TVA (20%)</span>
+                    <span className="calcul-value">{formatTotalPrice(totalPrice * 0.2)}</span>
+                  </div>
+                  <div className="calcul-item">
+                    <span className="calcul-label">Frais de livraison</span>
+                    <span className="calcul-value">{formatTotalPrice(0)}</span>
+                  </div>
+                  <div className="calcul-item">
+                    <span className="calcul-label">Remise globale</span>
+                    <span className="calcul-value">{formatTotalPrice(0)}</span>
+                  </div>
+                  <div className="calcul-total">
+                    <span className="calcul-total-label">Total TTC</span>
+                    <span className="calcul-total-value">{formatTotalPrice(totalPrice * 1.2)}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Boutons d'action */}
+              <div className="modal-actions">
                 <button 
-                  className="btn btn-success"
-                  onClick={handleSaveChanges}
+                  className="btn btn-secondary"
+                  onClick={onClose}
                 >
-                  <CheckCircle size={16} />
-                  Enregistrer les modifications
+                  Annuler
                 </button>
                 <button 
                   className="btn btn-primary"
-                  onClick={() => handleDownloadDevis(devis.id)}
+                  onClick={handleSavePrices}
+                  disabled={savingPrices}
                 >
-                  <Download size={16} />
-                  Télécharger le devis
+                  {savingPrices ? (
+                    <>
+                      <Loader size={16} className="spinner" />
+                      Enregistrement...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle size={16} />
+                      Enregistrer les modifications
+                    </>
+                  )}
                 </button>
               </div>
             </>
