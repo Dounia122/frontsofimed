@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FileUp, Send, AlertCircle, CheckCircle, Loader, MessageCircle, User, Phone, Mail, Calendar } from 'lucide-react';
+import { FileUp, Send, AlertCircle, CheckCircle, Loader, MessageCircle, User, Phone, Mail } from 'lucide-react';
 import axios from 'axios';
 import './DemandeDevis.css';
 import NewDevisForm from './NewDevisForm';
+import { Eye } from 'lucide-react';
 
 const getCurrentUser = () => {
   const user = JSON.parse(localStorage.getItem('user'));
@@ -28,48 +29,35 @@ const DemandeDevis = () => {
   const [sendingMessage, setSendingMessage] = useState(false);
   const messagesEndRef = useRef(null);
   const [showNewDevisForm, setShowNewDevisForm] = useState(false);
-
-  // Supprimer ou commenter le premier useEffect qui charge les données mockées
-  // useEffect(() => {
-  //   const user = JSON.parse(localStorage.getItem('user'));
-  //   if (user) {
-  //     setUserData(user);
-  //   }
-    
-  //   setDevisList(mockDevisList);
-  //   setLoading(false);
-  // }, []);
+  const [showCartDetails, setShowCartDetails] = useState(false);
+  const [cartItems, setCartItems] = useState([]);
+  const [loadingCart, setLoadingCart] = useState(false);
+  const [selectedDevis, setSelectedDevis] = useState(null);
 
   useEffect(() => {
-    // Scroll to bottom of messages when messages change
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
   useEffect(() => {
-    console.log('DemandeDevis.js - useEffect initial');
     const user = getCurrentUser();
     if (user) {
-      console.log('DemandeDevis.js - Utilisateur trouvé:', user);
       setUserData(user);
       fetchDevisList();
     } else {
-      console.log('DemandeDevis.js - Aucun utilisateur trouvé');
       setError("Utilisateur non connecté. Veuillez vous reconnecter.");
       setLoading(false);
     }
   }, []);
 
   const fetchDevisList = async () => {
-    console.log('DemandeDevis.js - Début fetchDevisList');
     setLoading(true);
     setError('');
     const token = localStorage.getItem('token');
     const user = getCurrentUser();
     
     try {
-      console.log('DemandeDevis.js - Tentative de récupération des devis pour userId:', user.id);
       const response = await axios({
         method: 'get',
         url: `http://localhost:8080/api/devis/client/${user.id}`,
@@ -79,53 +67,35 @@ const DemandeDevis = () => {
         }
       });
       
-      console.log('DemandeDevis.js - Réponse reçue:', response.data);
+      const formattedDevis = response.data.map(devis => ({
+        id: devis.id,
+        title: devis.cart ? `Devis pour ${devis.cart.name}` : 'Sans titre',
+        reference: devis.reference || `DEV-${devis.id}`,
+        status: devis.status || 'EN_ATTENTE',
+        createdAt: devis.createdAt,
+        updatedAt: devis.updatedAt,
+        paymentMethod: devis.paymentMethod || 'Non spécifié',
+        commentaire: devis.commentaire || '',
+        totale: devis.totale || 0,
+        commercial: devis.commercial ? {
+          id: devis.commercial.id,
+          firstName: devis.commercial.firstName || '',
+          lastName: devis.commercial.lastName || '',
+          email: devis.commercial.email || '',
+          phone: devis.commercial.phone || '',
+          employeeCode: devis.commercial.employeeCode || '',
+          imageUrl: devis.commercial.imageUrl || null
+        } : null
+      }));
       
-      if (!response.data || response.data.length === 0) {
-        console.log('DemandeDevis.js - Aucun devis trouvé');
-        setDevisList([]);
-        return;
-      }
-      
-      const formattedDevis = response.data.map(devis => {
-        // Ajout du log pour l'imageUrl du commercial
-        if (devis.commercial && devis.commercial.imageUrl) {
-          console.log('Image URL du commercial:', devis.commercial.imageUrl);
-          console.log('Nom du commercial:', devis.commercial.firstName, devis.commercial.lastName);
-        }
-        
-        return ({
-          id: devis.id,
-          title: devis.cart ? `Devis pour ${devis.cart.name}` : 'Sans titre',
-          reference: devis.reference || `DEV-${devis.id}`,
-          status: devis.status || 'EN_ATTENTE',
-          createdAt: devis.createdAt,
-          updatedAt: devis.updatedAt,
-          paymentMethod: devis.paymentMethod || 'Non spécifié',
-          commentaire: devis.commentaire || '',
-          totale: devis.totale || 0,
-          commercial: devis.commercial ? {
-            id: devis.commercial.id,
-            firstName: devis.commercial.firstName || '',
-            lastName: devis.commercial.lastName || '',
-            email: devis.commercial.email || '',
-            phone: devis.commercial.phone || '',
-            employeeCode: devis.commercial.employeeCode || '',
-            imageUrl: devis.commercial.imageUrl || null
-          } : null
-        });
-      });
-      
-      console.log('DemandeDevis.js - Devis formatés:', formattedDevis);
       setDevisList(formattedDevis);
-      setError('');
     } catch (err) {
-      console.error('DemandeDevis.js - Erreur détaillée:', err);
+      console.error('Erreur lors de la récupération des devis:', err);
       setError("Une erreur s'est produite lors de la récupération des devis.");
     } finally {
       setLoading(false);
     }
-};
+  };
 
   const fetchMessages = async (devisId) => {
     try {
@@ -138,8 +108,36 @@ const DemandeDevis = () => {
       setMessages(response.data);
     } catch (err) {
       console.error('Erreur lors du chargement des messages:', err);
-      // Use mock messages as fallback for development
-      setMessages(mockMessages.filter(msg => msg.devisId === devisId));
+      setMessages([]);
+    }
+  };
+
+  const handleViewCart = async (devis) => {
+    setLoadingCart(true);
+    setSelectedDevis(devis);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`http://localhost:8080/api/devis/${devis.id}/itemss`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      // Dans la fonction handleViewCart
+      const itemsWithCorrectImagePaths = response.data.map(item => ({
+        ...item,
+        imageUrl: item.imageUrl 
+          ? require(`../../assets/products/${item.imageUrl}`)
+          : require('../../assets/no-image.png')
+      }));
+      
+      setCartItems(itemsWithCorrectImagePaths);
+      setShowCartDetails(true);
+    } catch (err) {
+      console.error('Erreur lors du chargement des détails du devis:', err);
+      setError("Une erreur s'est produite lors du chargement des détails du devis.");
+    } finally {
+      setLoadingCart(false);
     }
   };
 
@@ -148,7 +146,6 @@ const DemandeDevis = () => {
     setShowChat(true);
     await fetchMessages(devis.id);
     
-    // Mark messages as read
     try {
       const token = localStorage.getItem('token');
       await axios.put(`http://localhost:8080/api/messages/devis/${devis.id}/read`, {}, {
@@ -184,13 +181,10 @@ const DemandeDevis = () => {
         }
       });
       
-      // Add new message to the list
       setMessages([...messages, response.data]);
       setNewMessage('');
     } catch (err) {
       console.error('Erreur lors de l\'envoi du message:', err);
-      
-      // For development: add message locally if API fails
       const newMsg = {
         id: Date.now(),
         devisId: activeDevis.id,
@@ -223,7 +217,6 @@ const DemandeDevis = () => {
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) {
-        console.warn('Invalid date string received:', dateString);
         return 'Date invalide';
       }
       
@@ -254,104 +247,13 @@ const DemandeDevis = () => {
 
   const handleDevisCreated = (newDevis) => {
     setShowNewDevisForm(false);
-    // Add the new devis to the list
     setDevisList([newDevis, ...devisList]);
   };
-
-  // Mock data for demonstration
-  const mockDevisList = [
-    {
-      id: 1,
-      reference: 'DEV-2023-001',
-      title: 'Demande de devis pour pompes industrielles',
-      status: 'EN_ATTENTE',
-      createdAt: '2023-11-15T10:30:00',
-      updatedAt: '2023-11-15T10:30:00',
-      unreadMessages: 2,
-      commercial: {
-        id: 101,
-        firstName: 'Sophie',
-        lastName: 'Martin',
-        email: 'sophie.martin@sofimed.com',
-        phone: '+212 6 12 34 56 78',
-        employeeCode: 'COM-2023-101'
-      }
-    },
-    {
-      id: 2,
-      reference: 'DEV-2023-002',
-      title: 'Devis pour équipement médical',
-      status: 'EN_COURS',
-      createdAt: '2023-11-10T14:45:00',
-      updatedAt: '2023-11-12T09:15:00',
-      unreadMessages: 0,
-      commercial: {
-        id: 102,
-        firstName: 'Thomas',
-        lastName: 'Dubois',
-        email: 'thomas.dubois@sofimed.com',
-        phone: '+212 6 23 45 67 89',
-        employeeCode: 'COM-2023-102'
-      }
-    },
-    {
-      id: 3,
-      reference: 'DEV-2023-003',
-      title: 'Devis pour valves et raccords',
-      status: 'TERMINÉ',
-      createdAt: '2023-11-05T11:20:00',
-      updatedAt: '2023-11-08T16:30:00',
-      unreadMessages: 0,
-      commercial: {
-        id: 103,
-        firstName: 'Amina',
-        lastName: 'Benali',
-        email: 'amina.benali@sofimed.com',
-        phone: '+212 6 34 56 78 90',
-        employeeCode: 'COM-2023-103'
-      }
-    }
-  ];
-
-  // Mock messages for demonstration
-  const mockMessages = [
-    {
-      id: 1,
-      devisId: 1,
-      senderId: 101,
-      senderName: 'Sophie Martin',
-      recipientId: userData?.id,
-      content: 'Bonjour, j\'ai bien reçu votre demande de devis pour les pompes industrielles. Pouvez-vous me préciser les spécifications techniques dont vous avez besoin?',
-      timestamp: '2023-11-15T11:30:00',
-      read: true
-    },
-    {
-      id: 2,
-      devisId: 1,
-      senderId: userData?.id,
-      senderName: userData?.username,
-      recipientId: 101,
-      content: 'Bonjour Sophie, merci pour votre réponse rapide. Nous recherchons des pompes avec un débit de 500L/min et une pression de 10 bars.',
-      timestamp: '2023-11-15T11:45:00',
-      read: true
-    },
-    {
-      id: 3,
-      devisId: 1,
-      senderId: 101,
-      senderName: 'Sophie Martin',
-      recipientId: userData?.id,
-      content: 'Parfait, je vais préparer un devis avec plusieurs options qui correspondent à vos besoins. Avez-vous une préférence pour la marque?',
-      timestamp: '2023-11-15T12:00:00',
-      read: false
-    }
-  ];
 
   return (
     <div className="devis-container">
       <header className="devis-header">
         <h2>Demandes de Devis</h2>
-        {/* Supprimer le bouton Nouvelle demande */}
       </header>
       
       <div className="devis-content">
@@ -398,7 +300,7 @@ const DemandeDevis = () => {
                       <p className="devis-date">Créé le: {formatDate(devis.createdAt)}</p>
                       <p className="devis-payment">Mode de paiement: {devis.paymentMethod}</p>
                       {devis.totale > 0 && (
-                        <p className="devis-total">Total: {devis.totale.toFixed(2)} €</p>
+                        <p className="devis-total">{devis.totale.toFixed(2)} MAD</p>
                       )}
                       {devis.commentaire && (
                         <p className="devis-comment">Commentaire: {devis.commentaire}</p>
@@ -426,8 +328,17 @@ const DemandeDevis = () => {
                       </button>
                       
                       <button 
+                        className="view-cart-btn"
+                        onClick={() => handleViewCart(devis)}
+                      >
+                        <Eye className="icon" size={16} />
+                        <span>Détails du devis</span>
+                      </button>
+                      
+                      <button 
                         className="chat-btn"
                         onClick={() => handleOpenChat(devis)}
+                        disabled={!devis.commercial}
                       >
                         <MessageCircle size={16} />
                         Contacter
@@ -444,16 +355,16 @@ const DemandeDevis = () => {
         )}
       </div>
       
-      {/* Chat Modal - Messenger-like interface */}
+      {/* Chat Modal */}
       {showChat && activeDevis && (
         <div className="chat-modal">
           <div className="chat-container">
             <div className="chat-header">
               <div className="chat-header-info">
                 <div className="chat-header-avatar">
-                  {activeDevis.commercial && activeDevis.commercial.imageUrl ? (
+                  {activeDevis.commercial?.imageUrl ? (
                     <img 
-                      src={require(`../Commercial/photo/${activeDevis.commercial.imageUrl}`)}
+                      src={`http://localhost:8080/api/commercials/images/${activeDevis.commercial.imageUrl}`}
                       alt={`${activeDevis.commercial.firstName} ${activeDevis.commercial.lastName}`}
                       className="commercial-avatar-img"
                       onError={(e) => {
@@ -464,7 +375,7 @@ const DemandeDevis = () => {
                       }}
                     />
                   ) : (
-                    `${activeDevis.commercial.firstName.charAt(0)}${activeDevis.commercial.lastName.charAt(0)}`
+                    `${activeDevis.commercial?.firstName?.charAt(0)}${activeDevis.commercial?.lastName?.charAt(0)}`
                   )}
                 </div>
                 <div className="chat-header-text">
@@ -483,7 +394,7 @@ const DemandeDevis = () => {
             <div className="chat-messages">
               {messages.length === 0 ? (
                 <div className="no-messages">
-                  <p>Commencez la conversation avec {activeDevis.commercial.firstName}.</p>
+                  <p>Commencez la conversation avec {activeDevis.commercial?.firstName}.</p>
                 </div>
               ) : (
                 messages.map((msg) => (
@@ -493,7 +404,7 @@ const DemandeDevis = () => {
                   >
                     {msg.senderId !== userData?.id && (
                       <div className="message-avatar">
-                        {activeDevis.commercial && activeDevis.commercial.imageUrl ? (
+                        {activeDevis.commercial?.imageUrl ? (
                           <img 
                             src={`http://localhost:8080/api/commercials/images/${activeDevis.commercial.imageUrl}`}
                             alt={msg.senderName || activeDevis.commercial.firstName}
@@ -566,7 +477,7 @@ const DemandeDevis = () => {
               <div className="commercial-image">
                 {selectedCommercial.imageUrl ? (
                   <img 
-                    src={require(`../Commercial/photo/${selectedCommercial.imageUrl}`)}
+                    src={`http://localhost:8080/api/commercials/images/${selectedCommercial.imageUrl}`}
                     alt={`${selectedCommercial.firstName} ${selectedCommercial.lastName}`}
                     className="commercial-profile-img"
                     onError={(e) => {
@@ -604,50 +515,69 @@ const DemandeDevis = () => {
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-const CommercialDetails = ({ commercial, onClose }) => {
-  return (
-    <div className="commercial-details-modal">
-      <div className="commercial-details-container">
-        <button className="close-btn" onClick={onClose}>×</button>
-        <div className="commercial-info">
-          {commercial.imageUrl ? (
-            <img 
-              src={require(`../Commercial/photo/${commercial.imageUrl}`)} 
-              alt={`${commercial.firstName} ${commercial.lastName}`}
-              className="commercial-avatar"
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = `${commercial.firstName.charAt(0)}${commercial.lastName.charAt(0)}`;
-              }}
-            />
-          ) : (
-            <div className="commercial-initials">
-              {commercial.firstName.charAt(0)}{commercial.lastName.charAt(0)}
+      
+      {/* Cart Details Modal */}
+      {showCartDetails && selectedDevis && (
+        <div className="devis-details-modall">
+          <div className="devis-details-containerr">
+            <div className="devis-details-headerr">
+              <div className="devis-details-titlee">
+                <img className="product-imagee" src={require('../../assets/logosofi1.png')} alt="SOFIMED Logo" />
+                <div>
+                  <h3>Détails du devis {selectedDevis.reference}</h3>
+                  <p className="devis-details-datee">Date: {formatDate(selectedDevis.createdAt)}</p>
+                </div>
+              </div>
+              <button className="close-details-btnn" onClick={() => setShowCartDetails(false)}>×</button>
             </div>
-          )}
-          <h3>{commercial.firstName} {commercial.lastName}</h3>
-          <p className="commercial-role">Commercial SOFIMED</p>
-          
-          <div className="contact-details">
-            <div className="contact-item">
-              <Phone size={16} />
-              <span>{commercial.phone}</span>
-            </div>
-            <div className="contact-item">
-              <Mail size={16} />
-              <span>{commercial.email}</span>
-            </div>
-            <div className="contact-item">
-              <User size={16} />
-              <span>Code: {commercial.employeeCode}</span>
-            </div>
+            
+            {loadingCart ? (
+              <div className="loading-state">
+                <Loader className="spinner" size={32} />
+                <p>Chargement des détails...</p>
+              </div>
+            ) : (
+              <div className="cart-items-listt">
+                {cartItems.length > 0 ? (
+                  cartItems.map((item) => (
+                    <div key={item.id} className="cart-itemm">
+                      <div className="cart-item-imagee">
+                        {item.imageUrl && (
+                          <img 
+                            src={item.imageUrl}
+                            alt={item.nom}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = require('../../assets/no-image.png');
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div className="cart-item-detailss">
+                        <h4>{item.nom}</h4>
+                        <p className="item-referencee">Réf: {item.reference}</p>
+                        {item.categorie && (
+                          <p className="item-categoryy">Catégorie: {item.categorie.nom}</p>
+                        )}
+                        <div className="item-pricingg">
+                          <p className="item-quantityy">Quantité: {item.quantity}</p>
+                          <p className="item-pricee">Prix unitaire: {item.prixUnitaire?.toFixed(2) || '0.00'} MAD</p>
+                          <p className="item-discountt">Remise: {item.remisePourcentage || 0}% ({(item.remiseMontant || 0).toFixed(2)} MAD)</p>
+                          <p className="item-totall">Total: {(item.totalItem || 0).toFixed(2)} MAD</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="empty-cart">
+                    <p>Aucun article trouvé dans ce devis</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -147,13 +147,57 @@ body {
 
 .devis-card {
   background-color: white;
-  border-radius: 0.75rem;
-  box-shadow: var(--shadow-sm);
-  padding: 1.5rem;
-  transition: all 0.2s ease;
-  border: 1px solid var(--gray-200);
+  border-radius: 0.85rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 
+              0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  padding: 2px;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  border: 1px solid rgba(229, 231, 235, 0.7);
   position: relative;
   overflow: hidden;
+  backdrop-filter: blur(2px);
+  background-clip: padding-box;
+  
+  /* Gradient border effect */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 0.8rem;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Hover effects */
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 
+                0 4px 6px -2px rgba(0, 0, 0, 0.03);
+    border-color: rgba(209, 213, 219, 0.5);
+    
+    &::before {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2));
+    }
+  }
+
+  /* Active state */
+  &:active {
+    transform: translateY(-1px);
+    transition-duration: 0.1s;
+  }
+
+  /* Focus state for accessibility */
+  &:focus-within {
+    outline: 2px solid rgba(99, 102, 241, 0.5);
+    outline-offset: 2px;
+  }
 }
 
 .devis-card:hover {
@@ -1044,32 +1088,495 @@ body {
   background: var(--gray-400);
 }
 
-/* Supprimer ces styles */
-.new-devis-btn {
+/* Style amélioré pour le bouton détails devis */
+.view-cart-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
-  background-color: var(--primary-600);
-  color: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary-600);
+  background-color: var(--primary-50);
+  border: 1px solid var(--primary-200);
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.view-cart-btn:hover {
+  background-color: var(--primary-100);
+  border-color: var(--primary-300);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.view-cart-btn:active {
+  transform: translateY(0);
+}
+
+.view-cart-btn .icon {
+  transition: transform 0.2s ease;
+}
+
+.view-cart-btn:hover .icon {
+  transform: scale(1.1);
+}
+
+/* Style pour les prix */
+.devis-total {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--primary-600);
+  text-align: right;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--gray-200);
+}
+
+/* Réduction de la taille des cartes */
+.devis-card {
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.devis-card-header h3 {
+  font-size: 0.95rem;
+}
+
+.devis-card-info p {
+  font-size: 0.85rem;
+  margin: 0.2rem 0;
+}
+
+/* Optimisation de l'espace */
+.devis-list {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+/* Ajout d'un effet de profondeur au survol */
+.devis-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}/* Modal de détails du devis */
+.devis-details-modal {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  backdrop-filter: blur(4px);
+}
+
+.devis-details-container {
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  background-color: white;
+  border-radius: 1rem;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.devis-details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--gray-200);
+  background-color: var(--gray-50);
+}
+
+.devis-details-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.devis-details-title img {
+  height: 40px;
+  width: auto;
+}
+
+.devis-details-title h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.devis-details-content {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.devis-details-info {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.devis-details-section {
+  background-color: var(--gray-50);
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--gray-200);
+}
+
+.devis-details-section h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin-bottom: 1rem;
+}
+
+.devis-details-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.devis-details-item:last-child {
+  border-bottom: none;
+}
+
+.devis-details-label {
+  color: var(--gray-600);
+  font-size: 0.875rem;
+}
+
+.devis-details-value {
+  font-weight: 500;
+  color: var(--gray-900);
+  font-size: 0.875rem;
+}
+
+.devis-details-total {
+  text-align: right;
+  padding: 1.5rem;
+  background-color: var(--gray-50);
+  border-top: 1px solid var(--gray-200);
+}
+
+.devis-details-total .total-amount {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--primary-600);
+}
+
+/* Nouveaux styles pour les cartes de devis */
+.devis-card-item {
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-sm);
+  padding: 1.5rem;
+  transition: all 0.2s ease;
+  border: 1px solid var(--gray-200);
+  margin-bottom: 1.5rem;
+}
+
+.devis-card-item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.devis-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.devis-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.devis-card-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.devis-card-info {
+  flex: 1;
+}
+
+.devis-reference, .devis-date, .devis-total {
+  font-size: 0.875rem;
+  margin: 0.25rem 0;
+}
+
+.devis-reference {
+  color: var(--primary-700);
+  font-weight: 500;
+}
+
+.devis-total {
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.btn-view-details {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--primary-50);
+  color: var(--primary-700);
   border: none;
   border-radius: 0.5rem;
-  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.new-devis-btn:hover {
-  background-color: var(--primary-700);
+.btn-view-details:hover {
+  background-color: var(--primary-100);
 }
 
-.create-devis-btn {
-  margin-top: 1rem;
-  padding: 0.75rem 1.25rem;
-  background-color: var(--primary-600);
-  color: white;
-  border: none;
-  border-radius: 0.5rem;
-  font-weight: 500;
-  cursor: pointer;
+
+/* Modal container */
+.devis-details-modall {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+  overflow-y: auto;
+  animation: fadeIn 0.3s ease-in-out;
 }
+
+/* Modal content */
+.devis-details-containerr {
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header section */
+.devis-details-headerr {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 25px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.devis-details-titlee {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.product-imagee {
+  width: 80px;
+  height: auto;
+  object-fit: contain;
+}
+
+.devis-details-titlee h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.devis-details-datee {
+  margin: 5px 0 0;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.close-details-btnn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #7f8c8d;
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+  padding: 0;
+}
+
+.close-details-btnn:hover {
+  color: #e74c3c;
+}
+
+/* Loading state */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  gap: 20px;
+}
+
+.loading-state p {
+  color: #7f8c8d;
+  font-size: 1.1rem;
+}
+
+.spinner {
+  color: #3498db;
+}
+
+/* Cart items list */
+.cart-items-listt {
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  max-height: 60vh;
+}
+
+.cart-itemm {
+  display: flex;
+  gap: 20px;
+  padding: 25px;
+  border-bottom: 1px solid #e9ecef;
+  transition: background-color 0.2s;
+}
+
+.cart-itemm:last-child {
+  border-bottom: none;
+}
+
+.cart-itemm:hover {
+  background-color: #f8f9fa;
+}
+
+.cart-item-imagee {
+  flex: 0 0 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cart-item-imagee img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+}
+
+.cart-item-detailss {
+  flex: 1;
+}
+
+.cart-item-detailss h4 {
+  margin: 0 0 8px;
+  color: #2c3e50;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.item-referencee, .item-categoryy {
+  margin: 4px 0;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+.item-pricingg {
+  margin-top: 15px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.item-pricingg p {
+  margin: 5px 0;
+  font-size: 0.95rem;
+}
+
+.item-quantityy {
+  color: #34495e;
+}
+
+.item-pricee {
+  color: #16a085;
+  font-weight: 500;
+}
+
+.item-discountt {
+  color: #e67e22;
+}
+
+.item-totall {
+  color: #c0392b;
+  font-weight: 600;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .devis-details-containerr {
+    max-width: 95%;
+  }
+  
+  .devis-details-titlee {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .cart-itemm {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .cart-item-imagee {
+    flex: 0 0 auto;
+    width: 100%;
+    height: 150px;
+  }
+  
+  .item-pricingg {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+/* ... existing code ... */

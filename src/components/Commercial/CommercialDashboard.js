@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Routes, Route } from 'react-router-dom';
 import { Home, FileText, MessageCircle, Users, History, Settings, HelpCircle, LogOut, ChartBar, Bell } from "lucide-react";
 import logo from '../../assets/logosofi1.png';
 import './CommercialDashboard.css';
+import CommercialDevis from './CommercialDevis';
+import CommercialClients from './CommercialClients';
+import CommercialStatistiques from './CommercialStatistiques';
+import CommercialHistorique from './CommercialHistorique';
 
 const CommercialDashboard = () => {
   const location = useLocation();
@@ -33,17 +37,17 @@ const CommercialDashboard = () => {
         
         <nav className="sidebar-nav">
           {[
-            { icon: Home, label: "Tableau de bord", path: "" },
-            { icon: Users, label: "Gestion Clients", path: "clients" },
-            { icon: FileText, label: "Devis", path: "devis" },
-            { icon: MessageCircle, label: "Consultations", path: "consultations" },
-            { icon: ChartBar, label: "Statistiques", path: "statistiques" },
-            { icon: History, label: "Historique" }
+            { icon: Home, label: "Tableau de bord", path: "/commercial/dashboard" },
+            { icon: Users, label: "Gestion Clients", path: "/commercial/dashboard/clients" },
+            { icon: FileText, label: "Devis", path: "/commercial/dashboard/devis" },
+            { icon: MessageCircle, label: "Consultations", path: "/commercial/dashboard/consultations" },
+            { icon: ChartBar, label: "Statistiques", path: "/commercial/dashboard/statistiques" },
+            { icon: History, label: "Historique", path: "/commercial/dashboard/historique" }
           ].map((item, index) => (
             <div 
               key={index}
               className="nav-item"
-              onClick={() => item.path && navigate(item.path)}
+              onClick={() => navigate(item.path)}
             >
               <item.icon size={18} />
               <span>{item.label}</span>
@@ -90,46 +94,57 @@ const CommercialDashboard = () => {
         </header>
         
         <div className="content-wrapper">
-          <div className="welcome-card">
-            <div className="card-content">
-              <h1>Bienvenue dans votre espace Commercial</h1>
-              <p className="welcome-text">
-                Gérez vos clients, consultez les devis et suivez vos performances.
-              </p>
-              <div className="card-actions">
-                <button className="btn btn-primary" onClick={() => navigate('clients')}>
-                  <Users size={16} />
-                  <span>Gérer mes clients</span>
-                </button>
-                <button className="btn btn-secondary" onClick={() => navigate('devis')}>
-                  <FileText size={16} />
-                  <span>Voir les devis</span>
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <div className="stats-grid">
-            {[
-              { icon: Users, label: "Clients actifs", value: "45", change: "+3 ce mois", positive: true },
-              { icon: FileText, label: "Devis en attente", value: "12", change: "À traiter" },
-              { icon: ChartBar, label: "Taux de conversion", value: "68%", change: "+5% ce mois", positive: true },
-              { icon: MessageCircle, label: "Consultations", value: "8", change: "En attente" }
-            ].map((stat, index) => (
-              <div key={index} className="stat-card">
-                <div className="stat-icon">
-                  <stat.icon size={20} color={stat.color} />
+          <Routes>
+            <Route path="/" element={
+              <>
+                <div className="welcome-card">
+                  <div className="card-content">
+                    <h1>Bienvenue dans votre espace Commercial</h1>
+                    <p className="welcome-text">
+                      Gérez vos clients, consultez les devis et suivez vos performances.
+                    </p>
+                    <div className="card-actions">
+                      <button className="btn btn-primary" onClick={() => navigate('/commercial/dashboard/clients')}>
+                        <Users size={16} />
+                        <span>Gérer mes clients</span>
+                      </button>
+                      <button className="btn btn-secondary" onClick={() => navigate('/commercial/dashboard/devis')}>
+                        <FileText size={16} />
+                        <span>Voir les devis</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="stat-info">
-                  <p className="stat-label">{stat.label}</p>
-                  <p className="stat-value">{stat.value}</p>
-                  <p className={`stat-change ${stat.positive ? 'positive' : ''}`}>
-                    {stat.change}
-                  </p>
+                
+                <div className="stats-grid">
+                  {[
+                    { icon: Users, label: "Clients actifs", value: "45", change: "+3 ce mois", positive: true },
+                    { icon: FileText, label: "Devis en attente", value: "12", change: "À traiter" },
+                    { icon: ChartBar, label: "Taux de conversion", value: "68%", change: "+5% ce mois", positive: true },
+                    { icon: MessageCircle, label: "Consultations", value: "8", change: "En attente" }
+                  ].map((stat, index) => (
+                    <div key={index} className="stat-card">
+                      <div className="stat-icon">
+                        <stat.icon size={20} color={stat.color} />
+                      </div>
+                      <div className="stat-info">
+                        <p className="stat-label">{stat.label}</p>
+                        <p className="stat-value">{stat.value}</p>
+                        <p className={`stat-change ${stat.positive ? 'positive' : ''}`}>
+                          {stat.change}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
-          </div>
+              </>
+            } />
+            <Route path="/clients" element={<CommercialClients />} />
+            <Route path="/devis" element={<CommercialDevis />} />
+            <Route path="/statistiques" element={<CommercialStatistiques />} />
+            <Route path="/consultations" element={<div>Page Consultations</div>} />
+            <Route path="/historique" element={<CommercialHistorique />} />
+          </Routes>
         </div>
       </main>
     </div>

@@ -20,6 +20,8 @@ const ClientDashboard = () => {
   const [cartItems, setCartItems] = useState([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [stompClient, setStompClient] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
     // Get user data from navigation state or localStorage
@@ -125,6 +127,62 @@ const ClientDashboard = () => {
     };
   }, [userData]);
 
+  // Fonction pour récupérer les notifications
+  const fetchNotifications = async (userId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8080/api/notifications/user/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setNotifications(data);
+      }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des notifications:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (userData) {
+      fetchNotifications(userData.id);
+    }
+  }, [userData]);
+
+  // Fonction pour marquer une notification comme lue
+  const markNotificationAsRead = async (notifId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:8080/api/notifications/${notifId}/read`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        setNotifications((prev) =>
+          prev.map((notif) =>
+            notif.id === notifId ? { ...notif, isRead: true } : notif
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour de la notification:", error);
+    }
+  };
+
+  // Quand on ouvre le menu, marquer toutes les notifications non lues comme lues
+  const toggleNotifications = () => {
+    setShowNotifications(!showNotifications);
+    if (!showNotifications) {
+      notifications
+        .filter((notif) => !notif.isRead)
+        .forEach((notif) => markNotificationAsRead(notif.id));
+    }
+  };
+
   return (
     <div className="dashboard-container">
       {/* Sidebar */}
@@ -215,16 +273,36 @@ const ClientDashboard = () => {
             <>
               <header className="main-header">
                 <h2>Tableau de Bord</h2>
-                <div className="header-actions">
-                  <button className="notification-badge">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                    </svg>
+                <div className="header-actions" style={{ position: "relative" }}>
+                  <button className="notif-btn" aria-label="Notifications" onClick={toggleNotifications}>
+                    <span className="notif-icon">
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                      </svg>
+                    </span>
                     {unreadMessages > 0 && (
-                      <span className="badge-count">{unreadMessages}</span>
+                      <span className="notif-badge">{unreadMessages}</span>
                     )}
                   </button>
+                  {showNotifications && (
+                    <div className="notif-dropdown">
+                      <div className="notif-dropdown-title">Notifications</div>
+                      <ul className="notif-dropdown-list">
+                        {notifications.length === 0 && (
+                          <li className="notif-dropdown-item empty">Aucune notification</li>
+                        )}
+                        {notifications.map((notif) => (
+                          <li
+                            key={notif.id}
+                            className={`notif-dropdown-item${notif.isRead ? " read" : " unread"}`}
+                          >
+                            {notif.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </header>
               

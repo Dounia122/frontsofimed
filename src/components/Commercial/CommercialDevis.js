@@ -24,6 +24,230 @@ const CommercialDevis = () => {
   const [selectedDevisForPrix, setSelectedDevisForPrix] = useState(null);
   const [showClientDetails, setShowClientDetails] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
+  const [currentCartId, setCurrentCartId] = useState(null);
+
+  const UpdateSingleCartItem = () => {
+    const handleUpdate = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          alert('Token manquant');
+          return;
+        }
+
+        // Récupérer le cartId du devis sélectionné
+        const cartIdResponse = await axios.get(
+          `http://localhost:8080/api/devis/id/${selectedDevis.id}`,
+          { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        const cartId = cartIdResponse.data;
+
+        // Récupérer les items du devis sélectionné
+        const itemsResponse = await axios.get(
+          `http://localhost:8080/api/devis/${selectedDevis.id}/items`,
+          { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+
+        if (!itemsResponse.data?.length) {
+          alert('Aucun produit trouvé dans ce devis');
+          return;
+        }
+
+        // Mettre à jour chaque produit
+        const updatePromises = itemsResponse.data.map(async (item) => {
+          try {
+            await updateCartItem(
+              cartId,
+              item.produit.id,
+              item.prixUnitaire || 0.00,
+              item.remisePourcentage || 0
+            );
+            console.log(`=== MISE À JOUR DU PRODUIT ${item.produit.reference} ===`);
+            console.log('ID Produit:', item.produit.id);
+            console.log('Nom:', item.produit.nom);
+            console.log('Prix Unitaire:', item.prixUnitaire);
+            console.log('Remise (%):', item.remisePourcentage);
+            console.log('Quantité:', item.quantity);
+          } catch (error) {
+            console.error(`Erreur lors de la mise à jour du produit ${item.produit.id}:`, error);
+            throw error;
+          }
+        });
+
+        await Promise.all(updatePromises);
+        alert('Tous les produits ont été mis à jour avec succès !');
+        
+      } catch (error) {
+        console.error('Erreur:', error);
+        alert(`Erreur : ${error.response?.data?.message || error.message}`);
+      }
+    };
+
+    return (
+      <div >
+        
+      </div>
+    );
+  };
+
+  const handleApplyDiscount = async (devisId) => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('Session expirée. Veuillez vous reconnecter.');
+      return;
+    }
+
+    // 1. Récupérer les items du devis
+    const itemsResponse = await axios.get(
+      `http://localhost:8080/api/devis/${devisId}/items`,
+      {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }
+    );
+
+    if (!itemsResponse.data?.length) {
+      alert('Aucun produit trouvé dans ce devis');
+      return;
+    }
+
+    // 2. Préparer les données pour la requête batch
+    const batchUpdates = itemsResponse.data.map(item => ({
+      cartId: item.cartId || 17,
+      produitId: item.produit.id,
+      prixUnitaire: item.prixUnitaire || item.produit.prix,
+      remisePourcentage: item.remisePourcentage || 0,
+      quantity: item.quantity || 1
+    }));
+
+    console.log('Données à envoyer:', JSON.stringify(batchUpdates, null, 2));
+
+    // 3. Envoyer la requête batch
+    const response = await axios.put(
+      'http://localhost:8080/api/cart-items/batch-update',
+      batchUpdates,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    console.log('Réponse du serveur:', response.data);
+    await fetchDevisList();
+    alert('Remises appliquées avec succès à tous les produits');
+
+  } catch (error) {
+    console.error('Erreur:', error);
+    alert(`Erreur: ${error.response?.data?.message || error.message}`);
+  }
+};
+
+// Ajoute cette fonction utilitaire pour afficher une modale de sélection de produit
+const updateCartItem = async (cartId, produitId, prixUnitaire, remisePourcentage) => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('Session expirée. Veuillez vous reconnecter.');
+    }
+
+    const response = await axios.put(
+      'http://localhost:8080/api/cart-items/update-by-cart-product',
+      null,
+      {
+        params: {
+          cartId,
+          produitId,
+          prixUnitaire: parseFloat(prixUnitaire).toFixed(2),
+          remisePourcentage: parseFloat(remisePourcentage).toFixed(2)
+        },
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour:', error);
+    throw error;
+  }
+};
+
+const openProductSelectModal = (items) => {
+  return new Promise((resolve) => {
+    const modal = document.createElement('div');
+    modal.className = 'product-select-modal';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Gestion des produits</h3>
+          <p>Sélectionnez les produits à modifier</p>
+        </div>
+        <div class="product-list">
+          ${items.map(item => `
+            <div class="product-card">
+              <div class="product-header">
+                <span class="product-badge">${item.produit.reference}</span>
+                <h4 class="product-title">${item.produit.nom}</h4>
+              </div>
+              <div class="product-details-grid">
+                <div class="detail-item">
+                  <span>Prix unitaire</span>
+                  <span class="value">${parseFloat(item.prixUnitaire).toFixed(2)} €</span>
+                </div>
+                <div class="detail-item">
+                  <span>Remise</span>
+                  <span class="value">${parseFloat(item.remisePourcentage).toFixed(2)} %</span>
+                </div>
+                <div class="detail-item">
+                  <span>Quantité</span>
+                  <span class="value">${item.quantity}</span>
+                </div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary">Annuler</button>
+          <button class="btn btn-primary">Appliquer les modifications</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const updateBtn = modal.querySelector('.btn-update');
+    const cancelBtn = modal.querySelector('.btn-cancel');
+
+    updateBtn.addEventListener('click', async () => {
+      try {
+        for (const item of items) {
+          await updateCartItem(
+            item.cartId,
+            item.produit.id,
+            item.prixUnitaire,
+            item.remisePourcentage
+          );
+        }
+        resolve(true);
+        modal.remove();
+      } catch (error) {
+        alert('Erreur lors de la mise à jour: ' + error.message);
+      }
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      resolve(false);
+      modal.remove();
+    });
+  });
+};
+
+
+
 
   const handleViewClient = async (devis) => {
     try {
@@ -56,10 +280,48 @@ const CommercialDevis = () => {
     }
   };
 
-  const handleViewDevis = (devis) => {
-    console.log('Devis sélectionné:', devis); // Vérifiez la console pour ce log
-    setSelectedDevisForPrix(devis);
-    setShowPrixModal(true);
+  const handleViewDevis = async (devis) => {
+    try {
+      console.log('Devis sélectionné:', devis);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError("Session expirée. Veuillez vous reconnecter.");
+        return;
+      }
+
+      // Récupération du cartId
+      console.log('Tentative de récupération du cartId...');
+      const cartIdResponse = await axios.get(
+        `http://localhost:8080/api/devis/id/${devis.id}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      
+      // Logs détaillés
+      console.log('Réponse complète de l\'API pour cartId:', cartIdResponse);
+      console.log('Données brutes de la réponse:', cartIdResponse.data);
+      
+      // Modification ici : cartIdResponse.data est directement l'ID
+      const cartId = cartIdResponse.data;
+      
+      if (!cartId) {
+        console.error('Cart ID non trouvé dans la réponse');
+      } else {
+        console.log('=== Informations CartID ===');
+        console.log('Devis ID:', devis.id);
+        console.log('Cart ID récupéré:', cartId);
+        console.log('========================');
+      }
+
+      // Affichage de la modale des prix
+      setSelectedDevisForPrix(devis);
+      setShowPrixModal(true);
+    } catch (err) {
+      console.error('Erreur lors de la récupération du cartId:', err);
+      // On continue quand même à afficher la modale même si on n'a pas pu récupérer le cartId
+      setSelectedDevisForPrix(devis);
+      setShowPrixModal(true);
+    }
   };
 
   useEffect(() => {
@@ -72,6 +334,7 @@ const CommercialDevis = () => {
       if (!token) {
         setError("Session expirée. Veuillez vous reconnecter.");
         setLoading(false);
+        navigate('/login');
         return;
       }
 
@@ -79,12 +342,16 @@ const CommercialDevis = () => {
       if (!user || !user.id) {
         setError("Informations utilisateur non disponibles");
         setLoading(false);
+        navigate('/login');
         return;
       }
 
       // Récupérer d'abord l'ID commercial
       const commercialResponse = await axios.get(`http://localhost:8080/api/commercials/user/${user.id}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (!commercialResponse.data || !commercialResponse.data.id) {
@@ -97,7 +364,10 @@ const CommercialDevis = () => {
       
       // Utiliser l'endpoint /api/devis/commercial/{commercialId}
       const response = await axios.get(`http://localhost:8080/api/devis/commercial/${commercialId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
 
       if (response.data) {
@@ -106,12 +376,12 @@ const CommercialDevis = () => {
       }
     } catch (err) {
       console.error('Erreur lors de la récupération des devis:', err);
-      if (err.response?.status === 403) {
-        setError("Accès refusé. Veuillez vérifier vos permissions.");
+      if (err.response?.status === 403 || err.response?.status === 401) {
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         navigate('/login');
       } else {
-        setError("Impossible de charger la liste des devis");
+        setError("Impossible de charger la liste des devis. Veuillez réessayer.");
       }
     } finally {
       setLoading(false);
@@ -141,7 +411,214 @@ const CommercialDevis = () => {
     }
   };
 
-  const handleOpenChat = async (devis) => {
+const openPriceEditModal = (items) => {
+  const productsData = {
+    timestamp: new Date().toISOString(),
+    products: items.map(item => ({
+      id: item.produit.id,
+      name: item.produit.nom,
+      reference: item.produit.reference,
+      unitPrice: item.prixUnitaire,
+      discount: item.remisePourcentage,
+      quantity: item.quantity,
+      total: (item.prixUnitaire * item.quantity * (1 - item.remisePourcentage/100)).toFixed(2)
+    })),
+    globalTotal: items.reduce((sum, item) => {
+      return sum + (item.prixUnitaire * item.quantity * (1 - item.remisePourcentage/100));
+    }, 0).toFixed(2)
+  };
+
+// Display as formatted JSON in console
+console.log(JSON.stringify(productsData, null, 2));
+
+  // Utiliser le premier item du tableau comme référence
+  const firstItem = items[0] || {};
+  
+  // Définir les valeurs par défaut
+  const defaultPrixUnitaire = firstItem?.prixUnitaire || 0;
+  const defaultPourcentage = firstItem?.remisePourcentage || 0;
+  const defaultQuantity = firstItem?.quantity || 1;
+
+  console.log('Données des produits au format JSON:', JSON.stringify(productsData, null, 2));
+
+  return new Promise((resolve) => {
+    const modal = document.createElement('div');
+    modal.className = 'price-edit-modal';
+
+    modal.innerHTML = `
+      <div class="modal-content">
+        <h3>Modifier le prix pour ${firstItem?.produit?.nom || 'Produit'}</h3>
+        <form id="priceEditForm">
+          <div class="form-group">
+            <label>Prix unitaire (MAD)</label>
+            <input 
+              type="number" 
+              id="prixUnitaire" 
+              value="${defaultPrixUnitaire}" 
+              step="0.01"
+              required
+            >
+          </div>
+          <div class="form-group">
+            <label>Remise (%)</label>
+            <input 
+              type="number" 
+              id="pourcentage" 
+              value="${defaultPourcentage}"
+              min="0" 
+              max="100"
+              required
+            >
+          </div>
+          <div class="form-group">
+            <label>Quantité</label>
+            <input 
+              type="number" 
+              id="quantity" 
+              value="${defaultQuantity}"
+              min="1"
+              required
+            >
+          </div>
+          <div class="prix-total">
+            <strong>Prix après remise:</strong> 
+            <span id="prixApresRemise">0</span> MAD
+          </div>
+          <div class="button-group">
+            <button type="button" class="save-db-btn primary">Enregistrer en Base de Données</button>
+            <button type="button" class="cancel-btn">Annuler</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const form = modal.querySelector('#priceEditForm');
+    const prixUnitaireInput = form.querySelector('#prixUnitaire');
+    const pourcentageInput = form.querySelector('#pourcentage');
+    const quantityInput = form.querySelector('#quantity');
+    const prixApresRemiseSpan = form.querySelector('#prixApresRemise');
+    const cancelBtn = modal.querySelector('.cancel-btn');
+
+    // Toujours réinitialiser les valeurs (sécurité)
+    prixUnitaireInput.value = defaultPrixUnitaire;
+    pourcentageInput.value = defaultPourcentage;
+    quantityInput.value = defaultQuantity;
+
+    // Fonction pour calculer et afficher le prix après remise
+    const calculatePrixApresRemise = () => {
+      const prixUnitaire = parseFloat(prixUnitaireInput.value || defaultPrixUnitaire);
+      const pourcentage = parseFloat(pourcentageInput.value || defaultPourcentage);
+      const quantity = parseInt(quantityInput.value || defaultQuantity);
+
+      const reduction = (prixUnitaire * pourcentage) / 100;
+      const prixReduit = (prixUnitaire - reduction) * quantity;
+      prixApresRemiseSpan.textContent = prixReduit.toFixed(2);
+    };
+
+    calculatePrixApresRemise();
+
+    prixUnitaireInput.addEventListener('input', calculatePrixApresRemise);
+    pourcentageInput.addEventListener('input', calculatePrixApresRemise);
+    quantityInput.addEventListener('input', calculatePrixApresRemise);
+
+    // Ajouter le gestionnaire pour le nouveau bouton de sauvegarde en base de données
+    const saveDbBtn = modal.querySelector('.save-db-btn');
+    saveDbBtn.onclick = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          alert('Session expirée. Veuillez vous reconnecter.');
+          return;
+        }
+
+        const prixUnitaire = parseFloat(prixUnitaireInput.value) || parseFloat(defaultPrixUnitaire);
+        const remisePourcentage = parseFloat(pourcentageInput.value) || parseFloat(defaultPourcentage);
+
+        // Mise à jour en base de données pour chaque item
+        for (const item of items) {
+          await axios.put(
+            'http://localhost:8080/api/cart-items/update-by-cart-product',
+            null,
+            {
+              params: {
+                cartId: item.cart.id,
+                produitId: item.produit.id,
+                prixUnitaire: prixUnitaire,
+                remisePourcentage: remisePourcentage
+              },
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          console.log(`Mise à jour en base de données réussie pour le produit ${item.produit.id}`);
+        }
+
+        alert('Modifications enregistrées avec succès en base de données');
+        document.body.removeChild(modal);
+        await fetchDevisList(); // Rafraîchir la liste
+      } catch (error) {
+        console.error('Erreur lors de la mise à jour en base de données:', error);
+        alert(`Erreur: ${error.response?.data?.message || error.message}`);
+      }
+    };
+
+    cancelBtn.onclick = () => {
+      document.body.removeChild(modal);
+      resolve(null);
+    };
+
+    // Ajouter le gestionnaire d'événements pour le bouton de mise à jour
+    const updatePriceBtn = modal.querySelector('#updatePriceBtn');
+    updatePriceBtn.onclick = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          alert('Token manquant');
+          return;
+        }
+
+        // Récupérer les valeurs actuelles du formulaire
+        const prixUnitaire = parseFloat(prixUnitaireInput.value) || parseFloat(defaultPrixUnitaire);
+        const remisePourcentage = parseFloat(pourcentageInput.value) || parseFloat(defaultPourcentage);
+
+        // Mettre à jour chaque item
+        for (const item of items) {
+          const response = await axios.put(
+            'http://localhost:8080/api/cart-items/cart-items/update-by-cart-product',
+            null,
+            {
+              params: {
+                cartId: 17,
+                produitId: 2,
+                prixUnitaire:11134,
+                remisePourcentage: 23
+              },
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          console.log(`Mise à jour réussie pour l'item ${item.id}:`, response.data);
+        }
+
+        alert('Prix mis à jour avec succès');
+        await fetchDevisList(); // Rafraîchir la liste des devis
+        document.body.removeChild(modal);
+        resolve(null);
+      } catch (error) {
+        console.error('Erreur lors de la mise à jour:', error);
+        alert(`Erreur lors de la mise à jour: ${error.response?.data?.message || error.message}`);
+      }
+    };
+  });
+};
+
+const handleOpenChat = async (devis) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -238,257 +715,204 @@ const LoadingState = () => (
 
   // Dans le rendu du tableau, modifiez la structure pour ajouter la nouvelle colonne
   return (
-    <div className="dashboard-container">
-      <aside className="dashboard-sidebar">
-        <div className="sidebar-header">
-          <div className="brand-logo">
-            <img src={logo} alt="SOFIMED Logo" />
-          </div>
-          <p className="brand-subtitle">Espace Commercial</p>
-        </div>
-        
-        <nav className="sidebar-nav">
-          {[
-            { icon: Home, label: "Tableau de bord", path: "" },
-            { icon: Users, label: "Gestion Clients", path: "clients" },
-            { icon: FileText, label: "Devis", path: "devis" },
-            { icon: MessageCircle, label: "Consultations", path: "consultations" },
-            { icon: ChartBar, label: "Statistiques", path: "statistiques" },
-            { icon: History, label: "Historique" }
-          ].map((item, index) => (
-            <div 
-              key={index}
-              className={`nav-item ${location.pathname.includes(item.path) ? 'active' : ''}`}
-              onClick={() => item.path && navigate(item.path)}
-            >
-              <item.icon size={18} />
-              <span>{item.label}</span>
-            </div>
-          ))}
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="user-profile">
-            <div className="avatar">
-              {userData?.username?.substring(0, 2).toUpperCase()}
-            </div>
-            <div className="user-info">
-              <p className="user-name">{userData?.username}</p>
-              <p className="user-email">{userData?.email}</p>
-            </div>
-          </div>
-          
-          <div className="footer-menu">
-            <div className="footer-item">
-              <Settings size={16} />
-              <span>Paramètres</span>
-            </div>
-            <div className="footer-item">
-              <HelpCircle size={16} />
-              <span>Aide & Support</span>
-            </div>
-            <div className="footer-item" onClick={handleLogout}>
-              <LogOut size={16} />
-              <span>Déconnexion</span>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      <main className="dashboard-main">
-        <div className="commercial-devis-container">
-          <div className="devis-header">
-            <h1>Gestion des Devis</h1>
-            <div className="devis-actions">
-              <div className="search-bar">
-                <Search size={20} />
-                <input
-                  type="text"
-                  placeholder="Rechercher un devis..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="status-filter"
-              >
-                <option value="TOUS">Tous les statuts</option>
-                <option value="EN_ATTENTE">En attente</option>
-                <option value="EN_COURS">En cours</option>
-                <option value="TERMINÉ">Terminé</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="devis-list">
-            {loading ? (
-              <div className="loading-state">
-                <Loader className="spinner" />
-                <p>Chargement des devis...</p>
-              </div>
-            ) : error ? (
-              <div className="error-state">
-                <AlertCircle />
-                <p>{error}</p>
-              </div>
-            ) : filteredDevis.length === 0 ? (
-              <div className="empty-state">
-                <FileText size={48} />
-                <p>Vous n'avez pas encore de devis associés à votre compte</p>
-              </div>
-            ) : (
-              <table className="devis-table">
-                <thead>
-                  <tr>
-                    <th>Référence</th>
-                    <th>Client</th>
-                    <th>Statut Client</th>
-                    <th>Date de création</th>
-                    <th>Statut</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredDevis.map(devis => (
-                    <tr key={devis.id}>
-                      <td>{devis.reference}</td>
-                      <td>
-                        <div className="client-info clickable" onClick={() => handleViewClient(devis)}>
-                          <User size={16} />
-                          <span>
-                            {devis.client ? `${devis.client.firstName || ''} ${devis.client.lastName || ''}` : 'Client '}
-                          </span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`client-status-badge ${devis.client ? getClientStatus(devis.client).class : 'client-unknown'}`}>
-                          {devis.client ? getClientStatus(devis.client).label : 'Statut inconnu'}
-                        </span>
-                      </td>
-                      <td>{new Date(devis.createdAt).toLocaleDateString('fr-FR')}</td>
-                      <td>
-                        <span className={`status-badge ${getStatusColor(devis.status)}`}>
-                          {devis.status ? devis.status.replace('_', ' ') : 'Status inconnu'}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="devis-actions-buttons">
-                          <button 
-                            className="action-btn view" 
-                            title="Voir le devis"
-                            onClick={() => handleViewDevis(devis)}
-                          >
-                            <Eye size={16} />
-                          </button>
-                          <button 
-                            className="action-btn download" 
-                            title="Télécharger"
-                            onClick={() => handleDownloadDevis(devis.id)}
-                          >
-                            <Download size={16} />
-                          </button>
-                          <button 
-                            className="contact-btn"
-                            onClick={() => handleOpenChat(devis)}
-                            disabled={!devis.id}
-                          >
-                            <MessageCircle size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {showClientDetails && selectedClient && (
-            <div className="client-details-modal">
-              <div className="client-details-container">
-                <div className="client-details-header">
-                  <h3>Détails du Client</h3>
-                  <button className="close-details-btn" onClick={() => setShowClientDetails(false)}>
-                    &times;
-                  </button>
-                </div>
-                
-                <div className="client-info-section">
-                  <h4>
-                    <User size={24} /> 
-                    Informations Personnelles
-                  </h4>
-                  <div className="client-info-row">
-                    <span className="client-info-label">
-                      <User size={18} /> 
-                      Nom complet
-                    </span>
-                    <span className="client-info-value">
-                      {selectedClient.firstName} {selectedClient.lastName}
-                    </span>
-                  </div>
-                  <div className="client-info-row">
-                    <span className="client-info-label">
-                      <Mail size={18} /> 
-                      Email
-                    </span>
-                    <span className="client-info-value">
-                      {selectedClient.email || 'Non spécifié'}
-                    </span>
-                  </div>
-                  <div className="client-info-row">
-                    <span className="client-info-label">
-                      <Phone size={18} /> 
-                      Téléphone
-                    </span>
-                    <span className="client-info-value">
-                      {selectedClient.phone || 'Non spécifié'}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="client-info-section">
-                  <h4>
-                    <ChartBar size={24} /> 
-                    Statistiques Client
-                  </h4>
-                  <div className="client-info-row">
-                    <span className="client-info-label">
-                      <FileText size={18} /> 
-                      Nombre de commandes
-                    </span>
-                    <span className="client-info-value">
-                      {selectedClient.orderCount || '0'}
-                    </span>
-                  </div>
-                  <div className="client-info-row">
-                    <span className="client-info-label">
-                      <History size={18} /> 
-                      Dernière commande
-                    </span>
-                    <span className="client-info-value">
-                      {selectedClient.lastOrderDate ? new Date(selectedClient.lastOrderDate).toLocaleDateString('fr-FR') : 'Aucune commande'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-         
-          {showPrixModal && selectedDevisForPrix && (
-            <PrixModal 
-              devis={selectedDevisForPrix} 
-              onClose={() => setShowPrixModal(false)}
-              onUpdate={fetchDevisList}
+    <div className="commercial-devis-container">
+      <UpdateSingleCartItem />
+      <div className="devis-header">
+        <h1>Gestion des Devis</h1>
+        <div className="devis-actions">
+          <div className="search-bar">
+            <Search size={20} />
+            <input
+              type="text"
+              placeholder="Rechercher par référence ou client..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
-          )}
+          </div>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="status-filter"
+          >
+            <option value="TOUS">Tous les statuts</option>
+            <option value="EN_ATTENTE">En attente</option>
+            <option value="EN_COURS">En cours</option>
+            <option value="TERMINÉ">Terminé</option>
+          </select>
         </div>
-      </main>
-      
-      {/* Ajouter le ChatModal ici, à l'intérieur du composant principal */}
+      </div>
+
+      <div className="devis-content">
+        {loading ? (
+          <div className="loading-state">
+            <Loader className="animate-spin" size={32} />
+            <p>Chargement des devis...</p>
+          </div>
+        ) : error ? (
+          <div className="error-state">
+            <AlertCircle size={32} color="var(--danger)" />
+            <p>{error}</p>
+          </div>
+        ) : filteredDevis.length === 0 ? (
+          <div className="empty-state">
+            <FileText size={48} color="var(--text-light)" />
+            <p>Aucun devis trouvé</p>
+          </div>
+        ) : (
+          <table className="devis-table">
+            <thead>
+              <tr>
+                <th>Référence</th>
+                <th>Client</th>
+                <th>Statut Client</th>
+                <th>Date de création</th>
+                <th>Statut</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredDevis.map(devis => (
+                <tr key={devis.id}>
+                  <td>{devis.reference}</td>
+                  <td>
+                    <div className="client-info clickable" onClick={() => handleViewClient(devis)}>
+                      <User size={16} />
+                      <span>
+                        {devis.client ? `${devis.client.firstName || ''} ${devis.client.lastName || ''}` : 'Client '}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`client-status-badge ${devis.client ? getClientStatus(devis.client).class : 'client-unknown'}`}>
+                      {devis.client ? getClientStatus(devis.client).label : 'Statut inconnu'}
+                    </span>
+                  </td>
+                  <td>{new Date(devis.createdAt).toLocaleDateString('fr-FR')}</td>
+                  <td>
+                    <span className={`status-badge ${getStatusColor(devis.status)}`}>
+                      {devis.status ? devis.status.replace('_', ' ') : 'Status inconnu'}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="devis-actions-buttons">
+                      <button 
+                        className="action-btn view" 
+                        title="Voir le devis"
+                        onClick={() => handleViewDevis(devis)}
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button 
+                        className="action-btn download" 
+                        title="Télécharger"
+                        onClick={() => handleDownloadDevis(devis.id)}
+                      >
+                        <Download size={16} />
+                      </button>
+                      <button 
+                        className="contact-btn"
+                        onClick={() => handleOpenChat(devis)}
+                        disabled={!devis.id}
+                      >
+                        <MessageCircle size={16} />
+                      </button>
+                      {/* Nouveau bouton pour appliquer une remise */}
+                      <button
+                        className="action-btn"
+                        title="Appliquer une remise"
+                        onClick={() => handleApplyDiscount(devis.id)}
+                      >
+                        <CheckCircle size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {showClientDetails && selectedClient && (
+        <div className="client-details-modal">
+          <div className="client-details-container">
+            <div className="client-details-header">
+              <h3>Détails du Client</h3>
+              <button className="close-details-btn" onClick={() => setShowClientDetails(false)}>
+                &times;
+              </button>
+            </div>
+            
+            <div className="client-info-section">
+              <h4>
+                <User size={24} /> 
+                Informations Personnelles
+              </h4>
+              <div className="client-info-row">
+                <span className="client-info-label">
+                  <User size={18} /> 
+                  Nom complet
+                </span>
+                <span className="client-info-value">
+                  {selectedClient.firstName} {selectedClient.lastName}
+                </span>
+              </div>
+              <div className="client-info-row">
+                <span className="client-info-label">
+                  <Mail size={18} /> 
+                  Email
+                </span>
+                <span className="client-info-value">
+                  {selectedClient.email || 'Non spécifié'}
+                </span>
+              </div>
+              <div className="client-info-row">
+                <span className="client-info-label">
+                  <Phone size={18} /> 
+                  Téléphone
+                </span>
+                <span className="client-info-value">
+                  {selectedClient.phone || 'Non spécifié'}
+                </span>
+              </div>
+            </div>
+            
+            <div className="client-info-section">
+              <h4>
+                <ChartBar size={24} /> 
+                Statistiques Client
+              </h4>
+              <div className="client-info-row">
+                <span className="client-info-label">
+                  <FileText size={18} /> 
+                  Nombre de commandes
+                </span>
+                <span className="client-info-value">
+                  {selectedClient.orderCount || '0'}
+                </span>
+              </div>
+              <div className="client-info-row">
+                <span className="client-info-label">
+                  <History size={18} /> 
+                  Dernière commande
+                </span>
+                <span className="client-info-value">
+                  {selectedClient.lastOrderDate ? new Date(selectedClient.lastOrderDate).toLocaleDateString('fr-FR') : 'Aucune commande'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPrixModal && selectedDevisForPrix && (
+        <PrixModal 
+          devis={selectedDevisForPrix} 
+          onClose={() => setShowPrixModal(false)}
+          onUpdate={fetchDevisList}
+        />
+      )}
+
       {showChat && selectedDevis && (
         <ChatModal 
           devis={selectedDevis}
@@ -499,10 +923,24 @@ const LoadingState = () => (
   );
 };
 
+// Fonction pour mettre à jour chaque item du panier d'un devis
+const updateAllCartItems = async (devisId, updateData) => {
+  try {
+    const token = localStorage.getItem('token');
+    // Ancienne logique remplacée par le nouvel endpoint dans handleApplyDiscount
+    // Cette fonction peut être conservée pour d'autres usages si besoin
+    // navigate n'est pas utilisé ici
+  } catch (err) {
+    console.error('Erreur lors de la mise à jour des items du panier:', err);
+  }
+};
+
+
 export default CommercialDevis;
 
 // Définition du composant ChatModal
 const ChatModal = ({ devis, onClose }) => {
+  const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -839,16 +1277,16 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
 
   const calculateTotal = (items, remisesObj) => {
     const total = items.reduce((sum, item) => {
-      const prix = item.prix !== null ? item.prix : 0;
+      const prix = item.prix !== null ? parseFloat(item.prix).toFixed(2) : 0;
       const quantity = item.quantity || 0;
       const remise = remisesObj[item.id] || 0;
       
       // Calculer le prix après remise
-      const prixApresRemise = prix * (1 - remise / 100);
+      const prixApresRemise = (prix * (1 - remise / 100)).toFixed(2);
       
-      return sum + (prixApresRemise * quantity);
+      return sum + (parseFloat(prixApresRemise) * quantity);
     }, 0);
-    setTotalPrice(total);
+    setTotalPrice(parseFloat(total.toFixed(2)));
   };
 
   const handlePriceChange = (id, newPrice) => {
@@ -903,7 +1341,7 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
   };
 
   // Fonction pour sauvegarder les modifications de prix et remises
-  const handleSavePrices = async () => {
+  const handleFormSubmit = async () => {
     try {
       setSavingPrices(true);
       const token = localStorage.getItem('token');
@@ -912,39 +1350,57 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
         return;
       }
 
-      // Préparer les données à envoyer
-      const itemPrices = {};
-      const itemDiscounts = {};
-      
-      produits.forEach(produit => {
-        itemPrices[produit.id] = produit.prix;
-        itemDiscounts[produit.id] = remises[produit.id] || 0;
-      });
-
-      // Envoyer la requête POST pour mettre à jour les prix et remises
-      await axios.post(
-        `http://localhost:8080/api/devis/${devis.id}/update-prices`,
+      // Utiliser l'ID du devis passé en props
+      const cartIdResponse = await axios.get(
+        `http://localhost:8080/api/devis/id/${devis.id}`,
         {
-          itemPrices: itemPrices,
-          itemDiscounts: itemDiscounts,
-          total: totalPrice
-        },
-        {
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
+      const cartId = cartIdResponse.data;
+      console.log("CartId récupéré :", cartId);
 
-      // Informer l'utilisateur et fermer le modal
-      alert('Prix et remises mis à jour avec succès');
-      onUpdate(); // Rafraîchir la liste des devis
-      onClose(); // Fermer le modal
+      const updateRequests = produits.map(async (produit) => {
+        const prixUnitaire = parseFloat(produit.prix ?? 0).toFixed(2);
+        const remise = parseFloat(remises[produit.id] ?? 0).toFixed(2);
+
+        if (parseFloat(prixUnitaire) <= 0) {
+          throw new Error(`Prix unitaire invalide pour produit ID ${produit.id}`);
+        }
+
+        const reduction = (parseFloat(prixUnitaire) * parseFloat(remise) / 100).toFixed(2);
+        const prixApresRemiseUnitaire = (parseFloat(prixUnitaire) - parseFloat(reduction)).toFixed(2);
+
+        await axios.put(
+          'http://localhost:8080/api/cart-items/update-by-cart-product',
+          null,
+          {
+            params: {
+              cartId: cartId,
+              produitId: produit.id,
+              prixUnitaire: parseFloat(prixApresRemiseUnitaire),
+              remisePourcentage: parseFloat(remise),
+            },
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+      });
+
+      await Promise.all(updateRequests);
+
+      onUpdate();
+      onClose();
     } catch (err) {
       console.error('Erreur lors de la mise à jour des prix:', err);
-      setError("Impossible de mettre à jour les prix: " + (err.response?.data || err.message));
+      setError("Une erreur est survenue lors de la sauvegarde des modifications.");
     } finally {
       setSavingPrices(false);
     }
   };
+  
+  
 
   return (
     <div className="prix-modal">
@@ -1048,7 +1504,7 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
                         <input 
                           type="text" 
                           className="price-input" 
-                          value={produit.prix === null || produit.prix === 0 ? '0' : produit.prix} 
+                          value={produit.prix !== undefined && produit.prix !== null ? produit.prix : ''} 
                           onChange={(e) => handlePriceChange(produit.id, e.target.value)}
                         />
                       </td>
@@ -1115,8 +1571,17 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
                 </button>
                 <button 
                   className="btn btn-primary"
-                  onClick={handleSavePrices}
+                  onClick={handleFormSubmit}
                   disabled={savingPrices}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#4CAF50',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    margin: '10px 0'
+                  }}
                 >
                   {savingPrices ? (
                     <>
@@ -1126,7 +1591,7 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
                   ) : (
                     <>
                       <CheckCircle size={16} />
-                      Enregistrer les modifications
+                      OK - Mettre à jour
                     </>
                   )}
                 </button>
@@ -1136,108 +1601,5 @@ const PrixModal = ({ devis, onClose, onUpdate }) => {
         </div>
       </div>
     </div>
-  );
-};
-
-const PrixForm = ({ devis, onClose, onUpdate }) => {
-  const [formData, setFormData] = useState({
-    prix: devis.prix || 0,
-    produits: []
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchProduits = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(`http://localhost:8080/api/devis/${devis.id}/produits`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        setFormData(prev => ({
-          ...prev,
-          produits: response.data
-        }));
-      } catch (err) {
-        console.error('Erreur:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProduits();
-  }, [devis.id]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const token = localStorage.getItem('token');
-      await axios.put(`http://localhost:8080/api/devis/${devis.id}/prix`, 
-        { prix: parseFloat(formData.prix) },
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
-      onUpdate();
-      onClose();
-    } catch (err) {
-      console.error('Erreur:', err);
-    }
-  };
-
-  return (
-    <form className="prix-form" onSubmit={handleSubmit}>
-      <h3>Détails du devis #{devis.reference}</h3>
-      
-      <div className="form-group">
-        <label>Client</label>
-        <input 
-          type="text"
-          value={`${devis.client.firstName} ${devis.client.lastName}`}
-          readOnly 
-        />
-      </div>
-
-      <div className="form-group">
-        <label>Prix total (DH)</label>
-        <input
-          type="number"
-          name="prix"
-          value={formData.prix}
-          onChange={handleChange}
-          min="0"
-          step="0.01"
-          required
-        />
-      </div>
-
-      <div className="produits-list">
-        <h4>Produits ({formData.produits.length})</h4>
-        {loading ? (
-          <div>Chargement...</div>
-        ) : (
-          formData.produits.map(produit => (
-            <div key={produit.id} className="produit-item">
-              <p><strong>{produit.nom}</strong></p>
-              <p>Prix unitaire: {produit.prix} DH</p>
-              <p>Quantité: {produit.quantite}</p>
-            </div>
-          ))
-        )}
-      </div>
-
-      <div className="form-actions">
-        <button type="button" onClick={onClose}>
-          Annuler
-        </button>
-        <button type="submit" className="primary">
-          Enregistrer
-        </button>
-      </div>
-    </form>
   );
 };

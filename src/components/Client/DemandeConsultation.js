@@ -56,20 +56,20 @@ const DemandeConsultation = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+  
     if (!subject.trim()) {
       setError('Veuillez saisir un sujet pour votre demande');
       return;
     }
-    
+  
     if (!message.trim()) {
       setError('Veuillez saisir un message pour votre demande');
       return;
     }
-    
+  
     setLoading(true);
     setError('');
-    
+  
     try {
       const formData = new FormData();
       formData.append('subject', subject);
@@ -78,34 +78,39 @@ const DemandeConsultation = () => {
         formData.append('file', file);
       }
       
+      // Ajout des infos utilisateur
+      if (userData) {
+        formData.append('userId', userData.id);
+        formData.append('username', userData.username);
+      }
+  
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:8080/api/consultations', formData, {
+      const response = await axios.post('http://localhost:8080/api/consultations', formData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'
         }
       });
-      
+  
       setSuccess(true);
       setSubject('');
       setMessage('');
       setFile(null);
       setFileName('');
-      
-      // Refresh consultations list
+  
       fetchConsultations();
-      
-      // Reset success message after 5 seconds
+  
       setTimeout(() => {
         setSuccess(false);
       }, 5000);
     } catch (err) {
       console.error('Erreur lors de l\'envoi de la demande:', err);
-      setError('Une erreur est survenue lors de l\'envoi de votre demande. Veuillez réessayer.');
+      setError(err.response?.data || 'Une erreur est survenue lors de l\'envoi de votre demande. Veuillez réessayer.');
     } finally {
       setLoading(false);
     }
   };
+  
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -222,7 +227,7 @@ const DemandeConsultation = () => {
               {consultations.map((consultation) => (
                 <div key={consultation.id} className="consultation-card">
                   <div className="consultation-header">
-                    <h4>{consultation.subject}</h4>
+                    <h2>{consultation.subject}</h2>
                     <span className={`status ${consultation.status.toLowerCase()}`}>
                       {consultation.status === 'PENDING' ? 'En attente' : 
                        consultation.status === 'IN_PROGRESS' ? 'En traitement' : 
