@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Routes, Route } from 'react-router-dom';
 import logo from '../../assets/logosofi1.png';
 import AdminConsultations from './AdminConsultations';
+import AdminOrders from './AdminOrders';
+import ProductManager from './ProductManager';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -94,6 +96,14 @@ const Dashboard = () => {
             >
               <span className="nav-icon">📈</span>
               <span>Statistiques</span>
+            </li>
+            {/* Nouveau lien Commandes */}
+            <li 
+              className={`nav-item ${activeItem === 'orders' ? 'active' : ''}`}
+              onClick={() => handleNavigation('orders')}
+            >
+              <span className="nav-icon">🛒</span>
+              <span>Commandes</span>
             </li>
           </ul>
         </nav>
@@ -195,7 +205,9 @@ const Dashboard = () => {
               </div>
             </>
           } />
+          <Route path="/products" element={<ProductManager />} />
           <Route path="consultations" element={<AdminConsultations />} />
+          <Route path="orders" element={<AdminOrders />} />
         </Routes>
       </main>
     </div>
